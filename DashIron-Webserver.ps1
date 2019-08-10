@@ -67,10 +67,10 @@ DerivedFrom: Markus Scholtes, Start-Webserver.ps1 v1.1, https://github.com/MScho
 #>
 
 param(
-    [string]$binding = 'http://localhost:8080/', 
-    [string]$basedir = ".", 
-    $openbrowser = $FALSE,
-    [string]$startpage = "",
+    [string] $binding = 'http://localhost:8080/', 
+    [string] $basedir = ".", 
+    [switch] $openbrowser,
+    [string] $startpage = "",
     $RunAs32 = $TRUE
 )
 <#
@@ -81,16 +81,8 @@ param(
  TODO: add a way to detect what type of shell needs to be run based on the connection being made, probably in the connection script
 
 #>
-# ensure $openbrowser is a Boolean
-try {
-    [System.Convert]::ToBoolean($openbrowser) > $NULL
-}
-catch [FormatException] {
-    Write-Host("$(Get-Date -Format s) Unable to convert openbrowser: $openbrowser to Boolean. Setting to FALSE.");
-    $openbrowser = $FALSE
-}
-
 # ensure $RunAs32 is a Boolean
+# $RunAs32 can be changed to a switch in the future, once TRUE a less sensible default
 try {
     [System.Convert]::ToBoolean($RunAs32) > $NULL
 }
@@ -98,9 +90,10 @@ catch [FormatException] {
     Write-Host("$(Get-Date -Format s) Unable to convert RunAs32: $RunAs32 to Boolean. Setting to TRUE.");
     $RunAs32 = $TRUE
 }
-# ensure we are running in a 32-bit shell
+
+# ensure we are running in a 32-bit shell if needed
 if ( ($env:PROCESSOR_ARCHITECTURE -ne "x86") -and ($RunAs32 -eq $TRUE) ) {
-    & "$env:windir\SysWOW64\WindowsPowerShell\v1.0\powershell.exe" -noexit -nop -executionpolicy bypass -nologo -windowstyle normal -mta -command ".\DashIron-WebServer.ps1 -binding $binding -basedir $basedir -startpage '$startpage' -openbrowser $openbrowser"
+    & "$env:windir\SysWOW64\WindowsPowerShell\v1.0\powershell.exe" -noexit -nop -executionpolicy bypass -nologo -windowstyle normal -mta -command ".\DashIron-WebServer.ps1 -binding $binding -basedir $basedir -startpage '$startpage' $(if($openbrowser){'-openbrowser'})"
     exit
 }
 if ( ([IntPtr]::size -ne 4) -and ($RunAs32 -eq $TRUE) ) {
@@ -133,9 +126,11 @@ $htmlResponseContents = @{
 <html><body>
 	!HEADERLINE
 	<pre>!RESULT</pre>
-	<form method="GET" action="/">
+    <form method="GET" action="/">
+    <!-- !!!THIS WILL ALLOW DIRECT EXECUTION WITH YOUR SHELL!!!
 	<b>!PROMPT&nbsp;</b><input type="text" maxlength=255 size=80 name="command" value='!FORMFIELD'>
-	<!-- !!!THIS WILL ALLOW DIRECT EXECUTION WITH YOUR SHELL!!! <input type="submit" name="button" value="Enter">-->
+    <input type="submit" name="button" value="Enter">
+    -->
 	</form>
 </body></html>
 "@
@@ -334,8 +329,7 @@ try {
             
             "GET /test" {	
                 try {
-                    # ... execute command
-                    $result = Invoke-Expression -ErrorAction SilentlyContinue ".\webDataAdapterTest.ps1" 2> $NULL | Out-String
+                    $result = '<html><title>Test</title><body><div style="margin:40px;">Good Test</div></body></html>'
                 }
                 catch	{ }
                 if ($Error.Count -gt 0) {
