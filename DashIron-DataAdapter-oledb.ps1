@@ -17,7 +17,7 @@ param (
      #>    
     [object] $params,
     [string] $SourceTable = $(if ($params.SourceTable) { $params.SourceTable } else { '[zTestTable0]' }),
-    [string] $Sourceinstance = $(if ($params.Sourceinstance) { $params.Sourceinstance } else { 'C:\opt\projects\DashIron\' }),
+    [string] $Sourceinstance = $(if ($params.Sourceinstance) { $params.Sourceinstance } else { '.\' }),
     [string] $Sourcedatabase = $(if ($params.Sourcedatabase) { $params.Sourcedatabase } else { 'TestDB.accdb' }),
     [string] $WhereFilter = $(if ($params.WhereFilter) { $params.WhereFilter } else { '1=1' }),
     [string] $Provider = $(if ($params.Provider) { $params.Provider } else { 'Microsoft.ACE.OLEDB.12.0' }),
@@ -31,12 +31,19 @@ function ErrorMessage {
     )
     return [ordered] @{error = @{message = $Message } } | ConvertTo-Json -Compress -Depth 5
 }
+
 try {
     # check the connection string
     if ($ConnectionString) {
         $strConn = $ConnectionString
     }
     elseif ($Provider -and $Sourceinstance -and $Sourcedatabase) {
+        #allow relative paths for the datasource
+        if ($Sourceinstance.Substring(0, 1) -eq "." -and $MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
+            Push-Location $basedir
+            $Sourceinstance = "$($ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Sourceinstance))\"
+            Pop-Location
+        }
         $strConn = "Provider=$Provider;Data Source=$Sourceinstance$Sourcedatabase"
     }
     else {
@@ -96,7 +103,7 @@ try {
     $strSqlHandler = ""
     try {
         # if the SQL was passed as an object, set the passed commands
-        if ($SQL.GetType().Name -like "*object") {
+        if ($SQL -and $SQL.GetType().Name -like "*object") {
             # Update
             if ($SQL.Update) {
                 $strSqlHandler = "$($SQL.Update)"
@@ -214,7 +221,13 @@ try {
                     }
                 }
                 else {
-                    $newrow[($_.Name)] = $Value.($_.Name)
+                    # because the data is going through a DataAdapter $null needs to become DBNull
+                    if ($Value.($_.Name) -eq $null) {
+                        $newrow[($_.Name)] = [DBNull]::Value
+                    }
+                    else {
+                        $newrow[($_.Name)] = $Value.($_.Name)
+                    }
                 }
             }
             #$newrow["StringField"] = $Value.StringField
@@ -255,7 +268,13 @@ try {
                     }
                 }
                 else {
-                    $table.Rows[0][($_.Name)] = $Value.($_.Name)
+                    # because the data is going through a DataAdapter $null needs to become DBNull
+                    if ($Value.($_.Name) -eq $null) {
+                        $table.Rows[0][($_.Name)] = [DBNull]::Value
+                    }
+                    else {
+                        $table.Rows[0][($_.Name)] = $Value.($_.Name)
+                    }
                 }
             }
             
