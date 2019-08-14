@@ -266,15 +266,15 @@ function Submit-FetchData {
 }
 
 # Starting the powershell webserver
-"$(Get-Date -Format s) Starting ASH-FE powershell webserver..."
+"$(Get-Date -Format s) Starting powershell webserver..."
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add($binding)
 $listener.Start()
 $Error.Clear()
 
 try {
-    "$(Get-Date -Format s) ASH-FE powershell webserver listening at $binding"
-    $webserverLog = "$(Get-Date -Format s) ASH-FE powershell webserver listening at $binding.`n"
+    "$(Get-Date -Format s) powershell webserver listening at $binding"
+    $webserverLog = "$(Get-Date -Format s) powershell webserver listening at $binding.`n"
     if ($openbrowser -eq $TRUE) {
         Write-Host "$(Get-Date -Format s) opening $binding$startpage"
         explorer.exe "$binding$startpage"
