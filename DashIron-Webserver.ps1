@@ -156,48 +156,11 @@ $htmlResponseContents = @{
 	!RESULT 
 "@
 
-    <#
-    'GET /download'        = @"
-<html><body>
-	!HEADERLINE
-	<pre>!RESULT</pre>
-	<form method="POST" action="/download">
-	<b>Path to file:</b><input type="text" maxlength=255 size=80 name="filepath" value='!FORMFIELD'>
-	<input type="submit" name="button" value="Download">
-	</form>
-</body></html>
-"@
-    'POST /download'       = @"
-<html><body>
-	!HEADERLINE
-	<pre>!RESULT</pre>
-	<form method="POST" action="/download">
-	<b>Path to file:</b><input type="text" maxlength=255 size=80 name="filepath" value='!FORMFIELD'>
-	<input type="submit" name="button" value="Download">
-	</form>
-</body></html>
-"@
-#>
-    <#
-    'GET /upload'          = @"
-<html><body>
-	!HEADERLINE
-	<form method="POST" enctype="multipart/form-data" action="/upload">
-	<p><b>File to upload:</b><input type="file" name="filedata"></p>
-	<b>Path to store on webserver:</b><input type="text" maxlength=255 size=80 name="filepath">
-	<input type="submit" name="button" value="Upload">
-	</form>
-</body></html>
-"@
-#>
-    #    'POST /script'         = "<html><body>!HEADERLINE<pre>!RESULT</pre></body></html>"
-    #    'POST /upload'         = "<html><body>!HEADERLINE<pre>!RESULT</pre></body></html>"
     'GET /exit'       = "<html><body>Stopped powershell webserver</body></html>"
     'GET /quit'       = "<html><body>Stopped powershell webserver</body></html>"
-    #    'GET /log'             = "<html><body>!HEADERLINELog of powershell webserver:<br /><pre>!RESULT</pre></body></html>"
+    'GET /log'        = "<html><body>!HEADERLINELog of powershell webserver:<br /><pre>!RESULT</pre></body></html>"
     'GET /starttime'  = "<html><body>!HEADERLINEPowershell webserver started at $(Get-Date -Format s)</body></html>"
     'GET /time'       = "<html><body>!HEADERLINECurrent time: !RESULT</body></html>"
-    #    'GET /beep'            = "<html><body>!HEADERLINEBEEP...</body></html>"
 }
 
 # Set navigation header line for all web pages
@@ -236,20 +199,13 @@ function Submit-FetchData {
         #$bodyData | Select -ExpandProperty parameter | write
         #Write-Host "End of client data."
 
-        #$execute = "function Powershell-WebServer-Func {`n" + '"' + $bodyData.parameter + '"' + "`n}`nPowershell-WebServer-Func"
         $requestParams = $bodyData.parameters
-        #$execute = '& "' + $bodyData.script + '"' + " -SourceTable " + $bodyData.parameters.SourceTable + " -WhereFilter " + $bodyData.parameters.WhereFilter
         # splat the params into the script
         $execute = '& "' + $bodyData.script + '"' + " -params @requestParams"
         try {
             # ... execute script
             #Write-Host "Executing $execute..."
             $result = Invoke-Expression -ErrorAction SilentlyContinue -Command $execute 2> $NULL | Out-String
-            # jobs can enable multithreading.. with additoinal work
-            # jobs also enable the -RunAs32 option, making forced launch of a 32-bit shell unnecessary
-            # https://thesurlyadmin.com/2013/03/04/multithreading-revisited-using-jobs/
-            # $execute = { Invoke-Expression '& "' + $bodyData.script + '"' + " -SourceTable " + $bodyData.parameters.SourceTable + " -WhereFilter " + $bodyData.parameters.WhereFilter }
-            #$result = Start-Job -ScriptBlock $execute -RunAs32 $TRUE | Out-String
         }
         catch	{ }
         if ($Error.Count -gt 0) {
@@ -354,350 +310,12 @@ try {
                 break
             }
 
-            <#
-            "GET /mydb" {
-                # execute command
-                # retrieve GET query string
-                #$formField = ''
-                #$formField = [uri]::UnescapeDataString(($request.Url.Query -replace "\+"," "))
-                # remove fixed form fields out of query string
-                #$formField = $formField -replace "\?command=","" -replace "\?button=enter","" -replace "&command=","" -replace "&button=enter",""
-                # when command is given...
-                #if (![string]::IsNullOrEmpty($formField))
-                #{
-                try {
-                    # ... execute command
-                    $result = Invoke-Expression -ErrorAction SilentlyContinue ".\webQueryTest.ps1" 2> $NULL | Out-String
-                }
-                catch	{ }
-                if ($Error.Count -gt 0) {
-                    # retrieve error message on error
-                    $result += "`nError while executing `n`n"
-                    $result += $Error[0]
-                    $Error.Clear()
-                }
-                #}
-                # preset form value with command for the caller's convenience
-                $htmlResponse = $htmlResponse -replace '!FORMFIELD', $formField
-                # insert powershell prompt to form
-                $prompt = "PS $PWD>"
-                $htmlResponse = $htmlResponse -replace '!PROMPT', $prompt
-                break
-            }
-            #>
-
-            <#
-            "GET /script" {
-                # present upload form, nothing to do here
-                break
-            }
-            #>
-            
-            <#
-            "POST /script" {
-                # upload and execute script
-
-                # only if there is body data in the request
-                if ($request.HasEntityBody) {
-                    # set default message to error message (since we just stop processing on error)
-                    $result = "Received corrupt or incomplete form data"
-
-                    # check content type
-                    if ($request.ContentType) {
-                        # retrieve boundary marker for header separation
-                        $boundary = $NULL
-                        if ($request.ContentType -match "boundary=(.*);")
-                        {	$boundary = "--" + $matches[1] }
-                        else {
-                            # marker might be at the end of the line
-                            if ($request.ContentType -match "boundary=(.*)$")
-                            { $boundary = "--" + $matches[1] }
-                        }
-
-                        if ($boundary) {
-                            # only if header separator was found
-
-                            # read complete header (inkl. file data) into string
-                            $reader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
-                            $data = $reader.ReadToEnd()
-                            $reader.Close()
-                            $request.InputStream.Close()
-
-                            $parameters = ""
-                            $sourceName = ""
-
-                            # separate headers by boundary string
-                            $data -replace "$boundary--\r\n", "$boundary`r`n--" -split "$boundary\r\n" | ForEach-Object {
-                                # omit leading empty header and end marker header
-                                if (($_ -ne "") -and ($_ -ne "--")) {
-                                    # only if well defined header (separation between meta data and data)
-                                    if ($_.IndexOf("`r`n`r`n") -gt 0) {
-                                        # header data before two CRs is meta data
-                                        # first look for the file in header "filedata"
-                                        if ($_.Substring(0, $_.IndexOf("`r`n`r`n")) -match "Content-Disposition: form-data; name=(.*);") {
-                                            $headerName = $matches[1] -replace '\"'
-                                            # headername "filedata"?
-                                            if ($headerName -eq "filedata") {
-                                                # yes, look for source filename
-                                                if ($_.Substring(0, $_.IndexOf("`r`n`r`n")) -match "filename=(.*)") {
-                                                    # source filename found
-                                                    $sourceName = $matches[1] -replace "`r`n$" -replace "`r$" -replace '\"'
-                                                    # store content of file in variable
-                                                    $filedata = $_.Substring($_.IndexOf("`r`n`r`n") + 4) -replace "`r`n$"
-                                                }
-                                            }
-                                        }
-                                        else {
-                                            # look for other headers (we need "parameter")
-                                            if ($_.Substring(0, $_.IndexOf("`r`n`r`n")) -match "Content-Disposition: form-data; name=(.*)") {
-                                                # header found
-                                                $headerName = $matches[1] -replace '\"'
-                                                # headername "parameter"?
-                                                if ($headerName -eq "parameter") {
-                                                    # yes, look for paramaters
-                                                    $parameters = $_.Substring($_.IndexOf("`r`n`r`n") + 4) -replace "`r`n$" -replace "`r$"
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            if ($sourceName -ne "") {
-                                # execute only if a source file exists
-
-                                $execute = "function Powershell-WebServer-Func {`n" + $filedata + "`n}`nPowershell-WebServer-Func " + $parameters
-                                try {
-                                    # ... execute script
-                                    $result = Invoke-Expression -ErrorAction SilentlyContinue $execute 2> $NULL | Out-String
-                                }
-                                catch	{ }
-                                if ($Error.Count -gt 0) {
-                                    # retrieve error message on error
-                                    $result += "`nError while executing script $sourceName`n`n"
-                                    $result += $Error[0]
-                                    $Error.Clear()
-                                }
-                            }
-                            else {
-                                $result = "No file data received"
-                            }
-                        }
-                    }
-                }
-                else {
-                    $result = "No client data received"
-                }
-                break
-            }
-            #>
-
-            <#
-            { $_ -like "* /download" } {
-                # GET or POST method are allowed for download page
-                # download file
-
-                # is POST data in the request?
-                if ($request.HasEntityBody) {
-                    # POST request
-                    # read complete header into string
-                    $reader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
-                    $data = $reader.ReadToEnd()
-                    $reader.Close()
-                    $request.InputStream.Close()
-
-                    # get headers into hash table
-                    $header = @{ }
-                    $data.Split('&') | ForEach-Object { $header.Add([uri]::UnescapeDataString(($_.Split('=')[0] -replace "\+", " ")), [uri]::UnescapeDataString(($_.Split('=')[1] -replace "\+", " "))) }
-
-                    # read header 'filepath'
-                    $formField = $header.Item('filepath')
-                    # remove leading and trailing double quotes since Test-Path does not like them
-                    $formField = $formField -replace "^`"", "" -replace "`"$", ""
-                }
-                else {
-                    # GET request
-
-                    # retrieve GET query string
-                    $formField = ''
-                    $formField = [uri]::UnescapeDataString(($request.Url.Query -replace "\+", " "))
-                    # remove fixed form fields out of query string
-                    $formField = $formField -replace "\?filepath=", "" -replace "\?button=download", "" -replace "&filepath=", "" -replace "&button=download", ""
-                    # remove leading and trailing double quotes since Test-Path does not like them
-                    $formField = $formField -replace "^`"", "" -replace "`"$", ""
-                }
-
-                # when path is given...
-                if (![string]::IsNullOrEmpty($formField)) {
-                    # check if file exists
-                    if (Test-Path $formField -PathType Leaf) {
-                        try {
-                            # ... download file
-                            $buffer = [System.IO.File]::ReadAllBytes($formField)
-                            $response.ContentLength64 = $buffer.Length
-                            $response.SendChunked = $FALSE
-                            $response.ContentType = "application/octet-stream"
-                            $filename = Split-Path -Leaf $formField
-                            $response.AddHeader("Content-Disposition", "attachment; filename=$filename")
-                            $response.AddHeader("Last-Modified", [IO.File]::GetLastWriteTime($formField).ToString('r'))
-                            $response.AddHeader("Server", "Powershell Webserver/1.1 on ")
-                            $response.OutputStream.Write($buffer, 0, $buffer.Length)
-                            # mark response as already given
-                            $responseWritten = $TRUE
-                        }
-                        catch	{ }
-                        if ($Error.Count -gt 0) {
-                            # retrieve error message on error
-                            $result += "`nError while downloading '$formField'`n`n"
-                            $result += $Error[0]
-                            $Error.Clear()
-                        }
-                    }
-                    else {
-                        # ... file not found
-                        $result = "File $formField not found"
-                    }
-                }
-                # preset form value with file path for the caller's convenience
-                $htmlResponse = $htmlResponse -replace '!FORMFIELD', $formField
-                break
-            }
-            #>
-
-            <#
-            "GET /upload" {
-                # present upload form, nothing to do here
-                break
-            }
-            #>
-
-            <#
-            "POST /upload" {
-                # upload file
-
-                # only if there is body data in the request
-                if ($request.HasEntityBody) {
-                    # set default message to error message (since we just stop processing on error)
-                    $result = "Received corrupt or incomplete form data"
-
-                    # check content type
-                    if ($request.ContentType) {
-                        # retrieve boundary marker for header separation
-                        $boundary = $NULL
-                        if ($request.ContentType -match "boundary=(.*);")
-                        {	$boundary = "--" + $matches[1] }
-                        else {
-                            # marker might be at the end of the line
-                            if ($request.ContentType -match "boundary=(.*)$")
-                            { $boundary = "--" + $matches[1] }
-                        }
-
-                        if ($boundary) {
-                            # only if header separator was found
-
-                            # read complete header (inkl. file data) into string
-                            $reader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
-                            $data = $reader.ReadToEnd()
-                            $reader.Close()
-                            $request.InputStream.Close()
-
-                            # variables for filenames
-                            $filename = ""
-                            $sourceName = ""
-
-                            # separate headers by boundary string
-                            $data -replace "$boundary--\r\n", "$boundary`r`n--" -split "$boundary\r\n" | ForEach-Object {
-                                # omit leading empty header and end marker header
-                                if (($_ -ne "") -and ($_ -ne "--")) {
-                                    # only if well defined header (seperation between meta data and data)
-                                    if ($_.IndexOf("`r`n`r`n") -gt 0) {
-                                        # header data before two CRs is meta data
-                                        # first look for the file in header "filedata"
-                                        if ($_.Substring(0, $_.IndexOf("`r`n`r`n")) -match "Content-Disposition: form-data; name=(.*);") {
-                                            $headerName = $matches[1] -replace '\"'
-                                            # headername "filedata"?
-                                            if ($headerName -eq "filedata") {
-                                                # yes, look for source filename
-                                                if ($_.Substring(0, $_.IndexOf("`r`n`r`n")) -match "filename=(.*)") {
-                                                    # source filename found
-                                                    $sourceName = $matches[1] -replace "`r`n$" -replace "`r$" -replace '\"'
-                                                    # store content of file in variable
-                                                    $filedata = $_.Substring($_.IndexOf("`r`n`r`n") + 4) -replace "`r`n$"
-                                                }
-                                            }
-                                        }
-                                        else {
-                                            # look for other headers (we need "filepath" to know where to store the file)
-                                            if ($_.Substring(0, $_.IndexOf("`r`n`r`n")) -match "Content-Disposition: form-data; name=(.*)") {
-                                                # header found
-                                                $headerName = $matches[1] -replace '\"'
-                                                # headername "filepath"?
-                                                if ($headerName -eq "filepath") {
-                                                    # yes, look for target filename
-                                                    $filename = $_.Substring($_.IndexOf("`r`n`r`n") + 4) -replace "`r`n$" -replace "`r$" -replace '\"'
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            if ($filename -ne "") {
-                                # upload only if a targetname is given
-                                if ($sourceName -ne "") {
-                                    # only upload if source file exists
-
-                                    # check or construct a valid filename to store
-                                    $targetName = ""
-                                    # if filename is a container name, add source filename to it
-                                    if (Test-Path $filename -PathType Container) {
-                                        $targetName = Join-Path $filename -ChildPath $(Split-Path $sourceName -Leaf)
-                                    }
-                                    else {
-                                        # try name in the header
-                                        $targetName = $filename
-                                    }
-
-                                    try {
-                                        # ... save file with the same encoding as received
-                                        [IO.File]::WriteAllText($targetName, $filedata, $request.ContentEncoding)
-                                    }
-                                    catch	{ }
-                                    if ($Error.Count -gt 0) {
-                                        # retrieve error message on error
-                                        $result += "`nError saving '$targetName'`n`n"
-                                        $result += $Error[0]
-                                        $Error.Clear()
-                                    }
-                                    else {
-                                        # success
-                                        $result = "File $sourceName successfully uploaded as $targetName"
-                                    }
-                                }
-                                else {
-                                    $result = "No file data received"
-                                }
-                            }
-                            else {
-                                $result = "Missing target file name"
-                            }
-                        }
-                    }
-                }
-                else {
-                    $result = "No client data received"
-                }
-                break
-            }
-            #>
-
-            <#
             "GET /log" {
                 # return the webserver log (stored in log variable)
                 $result = $webserverLog
                 break
             }
-            #>
+            
             "GET /time" {
                 # return current time
                 $result = Get-Date -Format s
@@ -708,14 +326,6 @@ try {
                 # return start time of the powershell webserver (already contained in $htmlResponse, nothing to do here)
                 break
             }
-
-            <#
-            "GET /beep" {
-                # Beep
-                [CONSOLE]::beep(800, 300) # or "`a" or [char]7
-                break
-            }
-            #>
 
             "GET /quit" {
                 # stop powershell webserver, nothing to do here
@@ -728,8 +338,7 @@ try {
             }
 
             default {
-                # unknown command, check if path to file
-
+                # unknown command, check if path to fil
                 # create physical path based upon the base dir and url
                 $checkDir = $basedir.TrimEnd("/\") + $request.Url.LocalPath
                 $checkFile = ""
