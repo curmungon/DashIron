@@ -117,80 +117,16 @@ if ($basedir -eq "") {
 # convert to absolute path
 $basedir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($basedir)
 
+#import the necessary modules
+Import-Module -Name .\DashIron-Router
+Import-Module -Name .\DashIron-Helper
+
 # MIME hash table for static content
 $mimehash = @{".avi" = "video/x-msvideo"; ".crt" = "application/x-x509-ca-cert"; ".css" = "text/css"; ".der" = "application/x-x509-ca-cert"; ".flv" = "video/x-flv"; ".gif" = "image/gif"; ".htm" = "text/html"; ".html" = "text/html"; ".ico" = "image/x-icon"; ".jar" = "application/java-archive"; ".jardiff" = "application/x-java-archive-diff"; ".jpeg" = "image/jpeg"; ".jpg" = "image/jpeg"; ".js" = "application/x-javascript"; ".mov" = "video/quicktime"; ".mp3" = "audio/mpeg"; ".mpeg" = "video/mpeg"; ".mpg" = "video/mpeg"; ".pdf" = "application/pdf"; ".pem" = "application/x-x509-ca-cert"; ".pl" = "application/x-perl"; ".png" = "image/png"; ".rss" = "text/xml"; ".shtml" = "text/html"; ".swf" = "application/x-shockwave-flash"; ".txt" = "text/plain"; ".war" = "application/java-archive"; ".wmv" = "video/x-ms-wmv"; ".xml" = "text/xml" }
-
-$routeRegister = @{ }
-
-# HTML answer templates for specific calls, placeholders !RESULT, !FORMFIELD, !PROMPT are allowed
-$htmlResponseContents = @{
-    'GET /asdf' = @"
-<html><body>
-	!HEADERLINE
-	<pre>!RESULT</pre>
-    <form method="GET" action="/">
-    <!-- !!!THIS WILL ALLOW DIRECT EXECUTION WITH YOUR SHELL!!!
-	<b>!PROMPT&nbsp;</b><input type="text" maxlength=255 size=80 name="command" value='!FORMFIELD'>
-    <input type="submit" name="button" value="Enter">
-    -->
-	</form>
-</body></html>
-"@
-
-}
 
 # Set navigation header line for all web pages
 $headerline = "<p><a href='/'>Command execution</a> <a href='/download'>Download file</a> <a href='/upload'>Upload file</a> <a href='/log'>Web logs</a> <a href='/starttime'>Webserver start time</a> <a href='/time'>Current time</a> <a href='/quit'>Stop webserver</a></p>"
 
-function Register-Route {
-    param (
-        [# route's HTTP method
-        Parameter(Position = 0)]
-        [ValidateSet('get', 'post', 'put')]
-        [string] $method,
-        [# route's route
-        Parameter(Position = 1)]
-        [ValidateNotNull()]
-        [string] $route,
-        [# route's action
-        Parameter(Position = 2)]
-        [ValidateNotNull()]
-        [scriptblock] $callback
-
-    )
-    switch ($route) {
-        "" { 
-            $route = "/"
-            break
-        }
-        { $route.Substring(0, 1) -ne "/" } { 
-            $route = "/$route"
-            break
-        }
-
-        Default { $route = $route }
-    }
-    
-    # if ( $routeRegister.Contains("$method $route") )... 
-    # duplicate entries will cause an error, allow the default error behavior
-    $routeRegister.Add("$method $route", $callback)
-}
-
-function Use-Path {
-    param (
-        [ValidateNotNullOrEmpty()]
-        [string] $path
-    )
-    
-}
-
-function Use-Script {
-    param (
-        [ValidateNotNullOrEmpty()]
-        [string] $path
-    )
-    
-}
 
 function Submit-FetchData {
     param (
@@ -236,9 +172,10 @@ function Submit-FetchData {
         catch	{ }
         if ($Error.Count -gt 0) {
             # retrieve error message on error
-            $result += "`nError while executing script $sourceName`n`n"
-            $result += $Error[0]
+            Write-Host "`nError while executing script $sourceName`n`n"
+            Write-Host $Error[0]
             $Error.Clear()
+            #no need to return the error here, the script should handle its errors.
         }
     }
     else {
@@ -247,7 +184,7 @@ function Submit-FetchData {
     return $result
 }
 
-
+# example route for "" using an HTML template 'here string'
 Register-Route GET "" { 
     $localhtml = @"
         <html><body>
@@ -278,13 +215,15 @@ Register-Route GET "" {
             $result += "`nError while executing '$formField'`n`n"
             $result += $Error[0]
             $Error.Clear()
+            $result = ErrorMessage($result)
         }
     }
     # preset form value with command for the caller's convenience
     $localhtml = $localhtml -replace '!FORMFIELD', $formField
     # insert powershell prompt to form
     $prompt = "PS $PWD>"
-    $localhtml -replace '!PROMPT', $prompt
+    $localhtml = $localhtml -replace '!PROMPT', $prompt
+    $localhtml -replace '!RESULT', $result
 }
 
 Register-Route get test { try {
@@ -296,6 +235,7 @@ Register-Route get test { try {
         $result += "`nError while executing `n`n"
         $result += $Error[0]
         $Error.Clear()
+        $result = ErrorMessage($result)
     }
     $result
 }
@@ -361,111 +301,77 @@ try {
 
         # is there a fixed coding for the request?
         $received = '{0} {1}' -f $request.httpMethod, $request.Url.LocalPath
-        $htmlResponse = $htmlResponseContents[$received]
+        $htmlResponse = ""
         $result = ''
 
         if ($routeRegister.Contains($received) ) {
             $htmlResponse = Invoke-Command -ScriptBlock $routeRegister.$received | Out-String
         }
         else {
-            
-            # check for known commands
-            switch ($received) {
-                "GET /asdf" {
-                    # execute command
-                    # retrieve GET query string
-                    $formField = ''
-                    $formField = [uri]::UnescapeDataString(($request.Url.Query -replace "\+", " "))
-                    # remove fixed form fields out of query string
-                    $formField = $formField -replace "\?command=", "" -replace "\?button=enter", "" -replace "&command=", "" -replace "&button=enter", ""
-                    # when command is given...
-                    if (![string]::IsNullOrEmpty($formField)) {
-                        try {
-                            # ... execute command
-                            $result = Invoke-Expression -ErrorAction SilentlyContinue $formField 2> $NULL | Out-String
-                        }
-                        catch	{ }
-                        if ($Error.Count -gt 0) {
-                            # retrieve error message on error
-                            $result += "`nError while executing '$formField'`n`n"
-                            $result += $Error[0]
-                            $Error.Clear()
-                        }
+            # unregistered route, check if path to file
+            # create physical path based upon the base dir and url
+            $checkDir = $basedir.TrimEnd("/\") + $request.Url.LocalPath
+            $checkFile = ""
+            if (Test-Path $checkDir -PathType Container) {
+                # physical path is a directory 
+                $indexList = "/index.htm", "/index.html", "/default.htm", "/default.html"
+                foreach ($indexName in $indexList) {
+                    # check if an index file is present
+                    $checkFile = $checkDir.TrimEnd("/\") + $indexName
+                    if (Test-Path $checkFile -PathType Leaf) {
+                        # index file found, path now in $checkFile
+                        break
                     }
-                    # preset form value with command for the caller's convenience
-                    $htmlResponse = $htmlResponse -replace '!FORMFIELD', $formField
-                    # insert powershell prompt to form
-                    $prompt = "PS $PWD>"
-                    $htmlResponse = $htmlResponse -replace '!PROMPT', $prompt
-                    break
-                }
-
-                default {
-                    # unknown command, check if path to fil
-                    # create physical path based upon the base dir and url
-                    $checkDir = $basedir.TrimEnd("/\") + $request.Url.LocalPath
                     $checkFile = ""
-                    if (Test-Path $checkDir -PathType Container) {
-                        # physical path is a directory 
-                        $indexList = "/index.htm", "/index.html", "/default.htm", "/default.html"
-                        foreach ($indexName in $indexList) {
-                            # check if an index file is present
-                            $checkFile = $checkDir.TrimEnd("/\") + $indexName
-                            if (Test-Path $checkFile -PathType Leaf) {
-                                # index file found, path now in $checkFile
-                                break
-                            }
-                            $checkFile = ""
-                        }
-                    }
-                    else {
-                        # no directory, check for file
-                        if (Test-Path $checkDir -PathType Leaf) {
-                            # file found, path now in $checkFile
-                            $checkFile = $checkDir
-                        }
-                    }
-
-                    if ($checkFile -ne "") {
-                        # static content available
-                        try {
-                            # ... serve static content
-                            $buffer = [System.IO.File]::ReadAllBytes($checkFile)
-                            $response.ContentLength64 = $buffer.Length
-                            $response.SendChunked = $FALSE
-                            $extension = [IO.Path]::GetExtension($checkFile)
-                            if ($mimehash.ContainsKey($extension)) {
-                                # known mime type for this file's extension available
-                                $response.ContentType = $mimehash.Item($extension)
-                            }
-                            else {
-                                # no, serve as binary download
-                                $response.ContentType = "application/octet-stream"
-                                $filename = Split-Path -Leaf $checkFile
-                                $response.AddHeader("Content-Disposition", "attachment; filename=$filename")
-                            }
-                            $response.AddHeader("Last-Modified", [IO.File]::GetLastWriteTime($checkFile).ToString('r'))
-                            $response.AddHeader("Server", "Powershell Webserver/1.1 on ")
-                            $response.OutputStream.Write($buffer, 0, $buffer.Length)
-                            # mark response as already given
-                            $responseWritten = $TRUE
-                        }
-                        catch	{ }
-                        if ($Error.Count -gt 0) {
-                            # retrieve error message on error
-                            $result += "`nError while downloading '$checkFile'`n`n"
-                            $result += $Error[0]
-                            $Error.Clear()
-                        }
-                    }
-                    else {
-                        # no file to serve found, return error
-                        $response.StatusCode = 404
-                        $htmlResponse = '<html><body>Page not found</body></html>'
-                    }
                 }
-
             }
+            else {
+                # no directory, check for file
+                if (Test-Path $checkDir -PathType Leaf) {
+                    # file found, path now in $checkFile
+                    $checkFile = $checkDir
+                }
+            }
+
+            if ($checkFile -ne "") {
+                # static content available
+                try {
+                    # ... serve static content
+                    $buffer = [System.IO.File]::ReadAllBytes($checkFile)
+                    $response.ContentLength64 = $buffer.Length
+                    $response.SendChunked = $FALSE
+                    $extension = [IO.Path]::GetExtension($checkFile)
+                    if ($mimehash.ContainsKey($extension)) {
+                        # known mime type for this file's extension available
+                        $response.ContentType = $mimehash.Item($extension)
+                    }
+                    else {
+                        # no, serve as binary download
+                        $response.ContentType = "application/octet-stream"
+                        $filename = Split-Path -Leaf $checkFile
+                        $response.AddHeader("Content-Disposition", "attachment; filename=$filename")
+                    }
+                    $response.AddHeader("Last-Modified", [IO.File]::GetLastWriteTime($checkFile).ToString('r'))
+                    $response.AddHeader("Server", "Powershell Webserver/1.1 on ")
+                    $response.OutputStream.Write($buffer, 0, $buffer.Length)
+                    # mark response as already given
+                    $responseWritten = $TRUE
+                }
+                catch	{ }
+                if ($Error.Count -gt 0) {
+                    # retrieve error message on error
+                    $result += "`nError while downloading '$checkFile'`n`n"
+                    $result += $Error[0]
+                    $Error.Clear()
+                    # Don't send a JSON formatted error for this
+                }
+            }
+            else {
+                # no file to serve found, return error
+                $response.StatusCode = 404
+                $htmlResponse = '<html><body>Page not found</body></html>'
+            }
+
         }
         # only send response if not already done
         if (!$responseWritten) {
