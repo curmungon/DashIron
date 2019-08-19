@@ -25,12 +25,6 @@ param (
     $SQL = $(if ($params.SQL) { $params.SQL } else { $null }),
     $Value = $(if ($params.Value) { $params.Value } else { $null })
 )
-function ErrorMessage {
-    param (
-        [Parameter(Mandatory = $true)][string] $Message
-    )
-    return [ordered] @{error = @{message = $Message } } | ConvertTo-Json -Compress -Depth 5
-}
 
 try {
     # check the connection string
@@ -311,6 +305,6 @@ try {
     $data | ConvertTo-Json -Compress -depth 100
 }
 catch {
-    Write-Error "while opening $Sourceinstance . $Sourcedatabase . $SourceTable : Error'$($_)' in script $($_.InvocationInfo.ScriptName) $($_.InvocationInfo.Line.Trim()) (line $($_.InvocationInfo.ScriptLineNumber)) char $($_.InvocationInfo.OffsetInLine) executing $($_.InvocationInfo.MyCommand) "
+    # Write-Error "while opening $Sourceinstance . $Sourcedatabase . $SourceTable : Error'$($_)' in script $($_.InvocationInfo.ScriptName) $($_.InvocationInfo.Line.Trim()) (line $($_.InvocationInfo.ScriptLineNumber)) char $($_.InvocationInfo.OffsetInLine) executing $($_.InvocationInfo.MyCommand) "
     return ErrorMessage("while opening $Sourceinstance . $Sourcedatabase . $SourceTable : Error'$($_)' in script $($_.InvocationInfo.ScriptName) $($_.InvocationInfo.Line.Trim()) (line $($_.InvocationInfo.ScriptLineNumber)) char $($_.InvocationInfo.OffsetInLine) executing $($_.InvocationInfo.MyCommand) ")
 }
