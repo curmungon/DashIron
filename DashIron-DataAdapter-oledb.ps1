@@ -16,9 +16,11 @@ param (
      complete "Data Source" pointing to the file, which is used in the Connection String. 
      #>    
     [object] $params,
+    [ValidateSet("select", "insert", "update", "upsert", "delete", $null)]
+    [string] $Action = $(if ($params.Action) { $params.Action } else { $null }),
     [string] $SourceTable = $(if ($params.SourceTable) { $params.SourceTable } else { '[zTestTable0]' }),
-    [string] $Sourceinstance = $(if ($params.Sourceinstance) { $params.Sourceinstance } else { '.\' }),
-    [string] $Sourcedatabase = $(if ($params.Sourcedatabase) { $params.Sourcedatabase } else { 'TestDB.accdb' }),
+    [string] $SourceInstance = $(if ($params.Sourceinstance) { $params.Sourceinstance } else { '.\' }),
+    [string] $SourceDatabase = $(if ($params.Sourcedatabase) { $params.Sourcedatabase } else { 'TestDB.accdb' }),
     [string] $WhereFilter = $(if ($params.WhereFilter) { $params.WhereFilter } else { '1=1' }),
     [string] $Provider = $(if ($params.Provider) { $params.Provider } else { 'Microsoft.ACE.OLEDB.12.0' }),
     [string] $ConnectionString = $(if ($params.ConnectionString) { $params.ConnectionString } else { $null }),
@@ -34,9 +36,7 @@ try {
     elseif ($Provider -and $Sourceinstance -and $Sourcedatabase) {
         #allow relative paths for the datasource
         if ($Sourceinstance.Substring(0, 1) -eq "." -and $MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
-            Push-Location $basedir
             $Sourceinstance = "$($ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Sourceinstance))\"
-            Pop-Location
         }
         $strConn = "Provider=$Provider;Data Source=$Sourceinstance$Sourcedatabase"
     }
@@ -192,94 +192,121 @@ try {
         Write-Host "out of the insert"
     }
 #>
-    if ($Value) {
-        if ($Value.GetType().Name -notlike "*object") {
-            return ErrorMessage("The Value must be valid JSON. `n`nThere was an error processing: `n$Value")
-        }
 
-        # this is essentially an INSERT... for now
-        # there are multiple records but data was submitted, put the submitted data in a new row
-        if ($table.Rows.Count -ne 1) {
-            # there is a potential problem with using MS Access and auto numbers
-            # this doc provides details for JET, but doesn't mention ACE... 
-            # batching seems to be the real root of the issue.
-            # https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/retrieving-identity-or-autonumber-values#retrieving-microsoft-access-autonumber-values
-            
-            $DataAdapter.Update($table) > $null
+    # when attempting to update a non-existant record, which is interpereted as an insert for now, 
+    # the WHERE clause of the SQL statement keeps the new record's auto generated PK from showing up in the results
+    # Obviously this needs to be resolved... upsert or some similar concept would be preferable
+    if (!$Action) {
+        if ($Value) {
+            if ($Value.GetType().Name -notlike "*object") {
+                return ErrorMessage("The Value must be valid JSON. `n`nThere was an error processing: `n$Value")
+            }
 
-            $newrow = $table.NewRow()
-            $Value | Get-Member -MemberType *Property | ForEach-Object {
-                if ($table.PrimaryKey.ColumnName -eq ($_.Name) ) {
-                    if ($table.PrimaryKey.AutoIncrement -eq $false ) {
-                        $newrow[($_.Name)] = $Value.($_.Name)
-                    }
-                }
-                else {
-                    # because the data is going through a DataAdapter $null needs to become DBNull
-                    if ($Value.($_.Name) -eq $null) {
-                        $newrow[($_.Name)] = [DBNull]::Value
+            # this is essentially an INSERT... for now
+            # there are multiple records but data was submitted, put the submitted data in a new row
+            if ($table.Rows.Count -ne 1) {
+                # there is a potential problem with using MS Access and auto numbers
+                # this doc provides details for JET, but doesn't mention ACE... 
+                # batching seems to be the real root of the issue.
+                # https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/retrieving-identity-or-autonumber-values#retrieving-microsoft-access-autonumber-values
+                
+                $DataAdapter.Update($table) > $null
+
+                $newrow = $table.NewRow()
+                $Value | Get-Member -MemberType *Property | ForEach-Object {
+                    if ($table.PrimaryKey.ColumnName -eq ($_.Name) ) {
+                        if ($table.PrimaryKey.AutoIncrement -eq $false ) {
+                            $newrow[($_.Name)] = $Value.($_.Name)
+                        }
                     }
                     else {
-                        $newrow[($_.Name)] = $Value.($_.Name)
+                        # because the data is going through a DataAdapter $null needs to become DBNull
+                        if ($Value.($_.Name) -eq $null) {
+                            $newrow[($_.Name)] = [DBNull]::Value
+                        }
+                        else {
+                            $newrow[($_.Name)] = $Value.($_.Name)
+                        }
                     }
                 }
+                #$newrow["StringField"] = $Value.StringField
+                $table.Rows.Add($newrow)
+                #$table | Out-Host
+                $dc = $table.GetChanges()
+                #$dc | Out-Host
+                #$DataAdapter.Update($dc);
+                #if ($table.PrimaryKey.AutoIncrement) {
+                #    $tablecopy.Merge($dc, $true)
+                #    $tablecopy.AcceptChanges()
+                #    Write-Host "List All Rows-inline (copy):"
+                #    $tablecopy | Out-Host
+                #}
+                
+                # Include an event to fill in the Autonumber value.
+                #$DataAdapter.RowUpdated += New-Object System.Data.OleDb.OleDbRowUpdatedEventHandler(OnRowUpdated);
+                # Update the database, inserting the new rows. 
+                #$DataAdapter.Update($dc);
+
+                $DataAdapter.Update($table) > $null
+                # these two are probably pointless, considering that table = dc below
+                #$table.Merge($dc)
+                #$table.AcceptChanges()
+                #$table.Rows = $table.Select("$($table.PrimaryKey.ColumnName)=$($dc.($table.PrimaryKey.ColumnName))")
+                
+                # setting the table equal to dc ensures that we are only returning the change
+                $table = $dc
+                #$DataAdapter.Fill($table) > $Null
             }
-            #$newrow["StringField"] = $Value.StringField
-            $table.Rows.Add($newrow)
+
+            # if there is only one row and data is recieved , try an update
+            else {
+                $Value | Get-Member -MemberType *Property | ForEach-Object {
+                    if ($table.PrimaryKey.ColumnName -eq ($_.Name) ) {
+                        if ($table.PrimaryKey.AutoIncrement -eq $false ) {
+                            $table.Rows[0][($_.Name)] = $Value.($_.Name)
+                        }
+                    }
+                    else {
+                        # because the data is going through a DataAdapter $null needs to become DBNull
+                        if ($Value.($_.Name) -eq $null) {
+                            $table.Rows[0][($_.Name)] = [DBNull]::Value
+                        }
+                        else {
+                            $table.Rows[0][($_.Name)] = $Value.($_.Name)
+                        }
+                    }
+                }
+                
+                #$table.Rows[0]["StringField"] = $Value.StringField
+                $DataAdapter.Update($table) > $null
+            }
+            # show the output from our changes
+            #Write-Host "List All Rows:"
             #$table | Out-Host
-            $dc = $table.GetChanges()
-            #$dc | Out-Host
-            #$DataAdapter.Update($dc);
-            #if ($table.PrimaryKey.AutoIncrement) {
-            #    $tablecopy.Merge($dc, $true)
-            #    $tablecopy.AcceptChanges()
-            #    Write-Host "List All Rows-inline (copy):"
-            #    $tablecopy | Out-Host
-            #}
-            
-            # Include an event to fill in the Autonumber value.
-            #$DataAdapter.RowUpdated += New-Object System.Data.OleDb.OleDbRowUpdatedEventHandler(OnRowUpdated);
-            # Update the database, inserting the new rows. 
-            #$DataAdapter.Update($dc);
-
-            $DataAdapter.Update($table) > $null
-            # these two are probably pointless, considering that table = dc below
-            #$table.Merge($dc)
-            #$table.AcceptChanges()
-            #$table.Rows = $table.Select("$($table.PrimaryKey.ColumnName)=$($dc.($table.PrimaryKey.ColumnName))")
-            
-            # setting the table equal to dc ensures that we are only returning the change
-            $table = $dc
-            #$DataAdapter.Fill($table) > $Null
         }
-
-        # if there is only one row and data is recieved , try an update
-        else {
-            $Value | Get-Member -MemberType *Property | ForEach-Object {
-                if ($table.PrimaryKey.ColumnName -eq ($_.Name) ) {
-                    if ($table.PrimaryKey.AutoIncrement -eq $false ) {
-                        $table.Rows[0][($_.Name)] = $Value.($_.Name)
-                    }
-                }
-                else {
-                    # because the data is going through a DataAdapter $null needs to become DBNull
-                    if ($Value.($_.Name) -eq $null) {
-                        $table.Rows[0][($_.Name)] = [DBNull]::Value
-                    }
-                    else {
-                        $table.Rows[0][($_.Name)] = $Value.($_.Name)
-                    }
-                }
-            }
-            
-            #$table.Rows[0]["StringField"] = $Value.StringField
-            $DataAdapter.Update($table) > $null
-        }
-        # show the output from our changes
-        #Write-Host "List All Rows:"
-        #$table | Out-Host
     }
-    
+    else {
+        Switch ( $Action ) {
+            "delete" {
+                # only allow single record deletes to help avoid accidental deletion
+                if ($table.Rows.Count -eq 1) {
+                    $table.Rows[0].Delete()
+                    $DataAdapter.Update($table) > $null
+                }
+                break
+            }
+            "insert" {
+                break
+            }
+            "update" {
+                break
+            }
+            "upsert" {
+                break
+            }
+        }
+    }
+
     # roll the data up and return it as JSON
     # The response structure is :
     #                    {data:[{obj1},{obj2},...]}
