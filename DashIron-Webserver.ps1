@@ -127,63 +127,6 @@ $mimehash = @{".avi" = "video/x-msvideo"; ".crt" = "application/x-x509-ca-cert";
 # Set navigation header line for all web pages
 $headerline = "<p><a href='/'>Command execution</a> <a href='/download'>Download file</a> <a href='/upload'>Upload file</a> <a href='/log'>Web logs</a> <a href='/starttime'>Webserver start time</a> <a href='/time'>Current time</a> <a href='/quit'>Stop webserver</a></p>"
 
-
-function Submit-FetchData {
-    param (
-        # Parameter help description
-        [Parameter(Mandatory)]
-        [System.Net.HttpListenerRequest] $request,
-        [string] $result
-    )
-    # upload and execute script
-    # only if there is body data in the request
-    if ($request.HasEntityBody) {
-        #Write-Host $request.ContentType
-        $contentType = $request.ContentType
-        [System.IO.Stream] $body = $request.InputStream;
-        [System.Text.Encoding] $encoding = $request.ContentEncoding;
-        [System.IO.StreamReader] $reader = New-Object System.IO.StreamReader($body, $encoding);
-        switch ($contentType) {
-            'application/json' {
-                [System.Object] $bodyData = $reader.ReadToEnd() | ConvertFrom-Json
-                break
-            }
-            { $_ -like "multipart/form-data*" } { 
-                Write-Host "Got Multipart Form"
-                [System.Object] $bodyData = $reader.ReadToEnd()
-                #[System.Net.Http.MultipartContent.MultipartFormDataContent] 
-                break
-            }
-        }
-        $body.Close();
-        $reader.Close();
-        #Write-Host $bodyData
-        #$bodyData | Select -ExpandProperty parameter | write
-        #Write-Host "End of client data."
-
-        $requestParams = $bodyData.parameters
-        # splat the params into the script
-        $execute = '& "' + $bodyData.script + '"' + " -params @requestParams"
-        try {
-            # ... execute script
-            #Write-Host "Executing $execute..."
-            $result = Invoke-Expression -ErrorAction SilentlyContinue -Command $execute 2> $NULL | Out-String
-        }
-        catch	{ }
-        if ($Error.Count -gt 0) {
-            # retrieve error message on error
-            Write-Host "`nError while executing script $sourceName`n`n"
-            Write-Host $Error[0]
-            $Error.Clear()
-            #no need to return the error here, the script should handle its errors.
-        }
-    }
-    else {
-        $result = "No client data received"
-    }
-    return $result
-}
-
 # example route for "" using an HTML template 'here string'
 Register-Route GET "" { 
     $localhtml = @"
@@ -242,12 +185,16 @@ Register-Route get test { try {
 
 Register-Route POST mydb {
     #get data from database
-    Submit-FetchData -request $request -result $result
+    $resolvedScriptPath = "$(Resolve-Path .\DashIron-DataAdapter-oledb.ps1)"
+    #write $resolvedScriptPath
+    Use-Path $basedir { Submit-FetchData -request $request -result $result -scriptPath $resolvedScriptPath }
 }
 
 Register-Route PUT mydb {
     #get data from database
-    Submit-FetchData -request $request -result $result
+    $resolvedScriptPath = "$(Resolve-Path .\DashIron-DataAdapter-oledb.ps1)"
+    
+    Use-Path $basedir { Submit-FetchData -request $request -result $result -scriptPath $resolvedScriptPath }
 }
  
 Register-Route GET mydb-multi {
