@@ -1,3 +1,5 @@
+# registered routes will be added to routeRegister
+# the method and route ,together, are the key the callback is the value
 $routeRegister = @{ }
 
 function Register-Route {
@@ -38,17 +40,62 @@ function Register-Route {
 function Use-Path {
     param (
         [ValidateNotNullOrEmpty()]
-        [string] $path
+        [string] $path,
+        [ValidateNotNullOrEmpty()]
+        [scriptblock] $command        
     )
-    
+    try {
+        if (Test-Path $path -PathType Container) {
+            Push-Location $path
+            try {
+                Invoke-Command -ScriptBlock $command
+            }
+            catch {
+                if ($Error.Count -gt 0) {
+                    # retrieve error message on error
+                    Write-Host $Error[0]
+                    $Error.Clear()
+                }
+            }
+            Pop-Location
+        }
+        else {
+            throw "Invald Folder Path. Path must resolve to a vaild folder. `nPath:`n$path"
+        }
+    }
+    catch {
+        if ($Error.Count -gt 0) {
+            # retrieve error message on error
+            Write-Host $Error[0]
+            $Error.Clear()
+        }
+    }
+
 }
 
 function Use-Script {
     param (
+        # path to script file
+        [Parameter(ParameterSetName = "stringPath")]
         [ValidateNotNullOrEmpty()]
-        [string] $path
+        [string] $scriptpath,
+        # scriptblock to use
+        [Parameter(ParameterSetName = "scriptBlock")]
+        [scriptblock]
+        $script
     )
-    
+    if ($scriptpath) {
+        try {
+            # verify the path is a valid leaf and a ps1f file
+            if (Test-Path -path $scriptpath -PathType Leaf -and $($scriptpath).endswith(".ps1")) {
+                
+            }
+        }
+        catch { }
+    }
+    elseif ($script) {
+        
+    }
 }
 
 
