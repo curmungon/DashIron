@@ -11,7 +11,6 @@ function Send-HttpRequestToScript {
         # Parameter help description
         [Parameter(Mandatory)]
         [System.Net.HttpListenerRequest] $request,
-        [string] $result,
         [Parameter(Mandatory)]
         [string] $scriptPath
     )
