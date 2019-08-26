@@ -71,7 +71,8 @@ param(
     [string] $basedir = ".", 
     [switch] $openbrowser,
     [string] $startpage = "",
-    $RunAs32 = $TRUE
+    $RunAs32 = $TRUE,
+    $RunOnce = $TRUE
 )
 <#
  a 32 bit shell is required in order to interface with 32 bit drivers. 
@@ -90,15 +91,43 @@ catch [FormatException] {
     Write-Host("$(Get-Date -Format s) Unable to convert RunAs32: $RunAs32 to Boolean. Setting to TRUE.");
     $RunAs32 = $TRUE
 }
+# ensure $RunOnce is a Boolean
+try {
+    [System.Convert]::ToBoolean($RunOnce) > $NULL
+}
+catch [FormatException] {
+    Write-Host("$(Get-Date -Format s) Unable to convert RunOnce: $RunOnce to Boolean. Setting to TRUE.");
+    $RunOnce = $TRUE
+}
+
+# build the options and command for starting the server's shell session
+$newShellOptions = '-noexit', '-noprofile', '-executionpolicy bypass', '-nologo', '-windowstyle normal', '-mta'
+$newShellCommand = "-command `".\DashIron-WebServer.ps1 -runas32 $RunAs32 -binding $binding -basedir $basedir -startpage '$startpage' $(if($openbrowser){'-openbrowser'}) -RunOnce false`""
+[string[]] $newShellArgs = $newShellOptions, $newShellCommand
 
 # ensure we are running in a 32-bit shell if needed
-if ( ($env:PROCESSOR_ARCHITECTURE -ne "x86") -and ($RunAs32 -eq $TRUE) ) {
-    & "$env:windir\SysWOW64\WindowsPowerShell\v1.0\powershell.exe" -noexit -nop -executionpolicy bypass -nologo -windowstyle normal -mta -command ".\DashIron-WebServer.ps1 -binding $binding -basedir $basedir -startpage '$startpage' $(if($openbrowser){'-openbrowser'})"
-    exit
+# otherwise, start a new shell with our configured options
+if ($RunOnce -eq $TRUE) {
+    if ( ([IntPtr]::size -ne 4) -and ($RunAs32 -eq $TRUE) ) {
+        Start-Process -FilePath "$env:windir\SysWOW64\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList $newShellArgs
+        exit
+    }
+    elseif (([IntPtr]::size -ne 4) -and ($RunAs32 -eq $FALSE)) {
+        Start-Process "powershell.exe" -ArgumentList $newShellArgs
+        exit
+    }
 }
+
 if ( ([IntPtr]::size -ne 4) -and ($RunAs32 -eq $TRUE) ) {
     Write-Host "$(Get-Date -Format s) Unable to start 32-bit PowerShell... Exiting"
     exit
+}
+
+if ([IntPtr]::size -ne 4) {
+    Write-Host "Running 64 bit shell..."
+}
+else {
+    Write-Host "Running 32 bit shell..."
 }
 
 # No adminstrative permissions are required for a binding to "localhost"
