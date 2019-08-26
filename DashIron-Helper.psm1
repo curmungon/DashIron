@@ -6,7 +6,7 @@ function ErrorMessage {
     [ordered] @{error = @{message = $Message } } | ConvertTo-Json -Compress -Depth 5
 }
 
-function Submit-FetchData {
+function Send-HttpRequestToScript {
     param (
         # Parameter help description
         [Parameter(Mandatory)]
