@@ -44,9 +44,9 @@ The Use-Path function also allows you to temporarily change the path to execute 
 
 Like this:
 
-```
+```powershell
 Register-Route get dataentry.html {
-    Use-Path $basedir\..\public\ { Get-Content .\dataentryexample.html }
+    Use-Path "$basedir\..\public\" { Get-Content .\dataentryexample.html }
 }
 ```
 
@@ -60,7 +60,7 @@ To set an action for a specifc route use `Register-Route` with the method (get, 
 
 _The server must be restarted for routing changes to take effect_
 
-```
+```powershell
 Register-Route get test {
     '<html><title>Test</title><body><div style="margin:40px;">Good Test</div></body></html>'
 }
@@ -68,7 +68,7 @@ Register-Route get test {
 
 Routes with spaces must be wrapped in quotes; however, quotes are optional on methods. Also, both routes and methods are case insensitive (like most things in PowerShell).
 
-```
+```powershell
 Register-Route "GET" "test me" {
     '<html><title>Test</title><body><div style="margin:40px;">Good Test Me</div></body></html>'
 }
@@ -84,7 +84,7 @@ The following takes the script `DashIron-DataAdapter-oledb.ps1`, which makes a c
 
 _The script path is resolved before passing it in because `Use-Path` changes the path that the relative reference will resolve to._
 
-```
+```powershell
 Register-Route POST mydb {
     #get data from database
     $resolvedScriptPath = "$(Resolve-Path .\DashIron-DataAdapter-oledb.ps1)"
@@ -103,39 +103,41 @@ With a POST request, provide the appropriate parameters and data will be returne
 
 Using the [MDN fetch() POST example]...
 
-```
+```javascript
 //relative references in SourceInstance are resolved by DashIron
 postData("http://localhost:8080/mydb", {
-            SourceInstance: "./",
-            SourceDatabase: "TestDB.accdb",
-            Provider: "Microsoft.ACE.OLEDB.12.0",
-            SQL: "SELECT TOP 100 * From [TestTable]",
-            WhereFilter: "1=1"
-          })
+  SourceInstance: "./",
+  SourceDatabase: "TestDB.accdb",
+  Provider: "Microsoft.ACE.OLEDB.12.0",
+  SQL: "SELECT TOP 100 * From [TestTable]",
+  WhereFilter: "1=1"
+});
 
 //If SQL isn't passed the default is to SELECT * FROM [<SourceTable>]
 postData("http://localhost:8080/mydb", {
-            SourceInstance: "./",
-            SourceDatabase: "TestDB.accdb",
-            SourceTable: "TestTable",
-            Provider: "Microsoft.ACE.OLEDB.12.0",
-            WhereFilter: "1=1"
-          })
+  SourceInstance: "./",
+  SourceDatabase: "TestDB.accdb",
+  SourceTable: "TestTable",
+  Provider: "Microsoft.ACE.OLEDB.12.0",
+  WhereFilter: "1=1"
+});
 ```
 
 Or, using SQL and a Connection String.
 
-```
+```javascript
 // a fully qualified (absolute) path must be used for ConnectionString
 postData("http://localhost:8080/mydb", {
-            SQL: "SELECT * FROM [TestTable]",
-            ConnectionString: "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=D:\databases\TestDB.accdb"
-        })
+  SQL: "SELECT * FROM [TestTable]",
+  ConnectionString:
+    "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=D:databasesTestDB.accdb"
+});
 
 postData("http://localhost:8080/mydb", {
-            SQL: { Select: "SELECT * FROM [TestTable]" },
-            ConnectionString: "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=D:\databases\TestDB.accdb"
-        })
+  SQL: { Select: "SELECT * FROM [TestTable]" },
+  ConnectionString:
+    "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=D:databasesTestDB.accdb"
+});
 ```
 
 SQL can be passed as a string (SELECT only), or an object with a SELECT and other actions (only INSERT, UPDATE, and/or DELETE). Defining the additional actions allows them to use complex SQL expressions if needed.
@@ -144,28 +146,28 @@ SQL can be passed as a string (SELECT only), or an object with a SELECT and othe
 
 Insert/Update require that a `Value` is submitted. The current effect is basically an implied Upsert (Update/Insert). If the SQL statement returns one (1) record it will be updated. If the SQL statement returns 0 or more than 1 record, it will perform an insert.
 
-```
+```javascript
 postData("http://localhost:8080/mydb", {
-            SourceInstance: "./",
-            SourceDatabase: "TestDB.accdb",
-            SourceTable: "TestTable",
-            Provider: "Microsoft.ACE.OLEDB.12.0",
-            WhereFilter:
-            pk === "" || pk === null || pk === undefined ? "1=1" : `ID=${pk}`,
-            Value: {
-                ID: pk,
-                StringField: document.getElementById("value").value,
-                WatchbillDate: document.getElementById("wbDate").value,
-                bool: true
-            }
-        })
+  SourceInstance: "./",
+  SourceDatabase: "TestDB.accdb",
+  SourceTable: "TestTable",
+  Provider: "Microsoft.ACE.OLEDB.12.0",
+  WhereFilter:
+    pk === "" || pk === null || pk === undefined ? "1=1" : `ID=${pk}`,
+  Value: {
+    ID: pk,
+    StringField: document.getElementById("value").value,
+    WatchbillDate: document.getElementById("wbDate").value,
+    bool: true
+  }
+});
 ```
 
 ## Delete
 
 Deleting items can be done by sending `Action: "delete"`. This will only delete one element at a time. It deletes the first row returned by the query.
 
-```
+```javascript
 postData("http://localhost:8080/mydb", {
             SourceInstance: "./",
             SourceDatabase: "TestDB.accdb"
@@ -181,7 +183,7 @@ postData("http://localhost:8080/mydb", {
 
 The requested data will be returned as JSON array of objects in `data`.
 
-```
+```json
 {
   "data": [
     {
