@@ -198,32 +198,36 @@ Register-Route GET "" {
     $localhtml -replace '!RESULT', $result
 }
 
-Register-Route get test { try {
-        $result = '<html><title>Test</title><body><div style="margin:40px;">Good Test</div></body></html>'
-    }
-    catch	{ }
-    if ($Error.Count -gt 0) {
-        # retrieve error message on error
-        $result += "`nError while executing `n`n"
-        $result += $Error[0]
-        $Error.Clear()
-        $result = ErrorMessage($result)
-    }
-    $result
+Register-Route get test {
+    '<html><title>Test</title><body><div style="margin:40px;">Good Test</div></body></html>'
+}
+
+Register-Route "GET" "test me" {
+    '<html><title>Test</title><body><div style="margin:40px;">Good Test Me</div></body></html>'
+}
+
+# need to figure out some way of setting up something similar to express' "static" 
+# for properly serving the web page's associated documents
+Register-Route get dataview.html {
+    Use-Path $basedir\..\DashIronTestDocs\WatchView { Get-Content .\dataview.html }
+}
+
+Register-Route get dataentry.html {
+    Use-Path $basedir\..\DashIronTestDocs\ { Get-Content .\dataentry1.html }
 }
 
 Register-Route POST mydb {
     #get data from database
     $resolvedScriptPath = "$(Resolve-Path .\DashIron-DataAdapter-oledb.ps1)"
     #write $resolvedScriptPath
-    Use-Path $basedir { Submit-FetchData -request $request -result $result -scriptPath $resolvedScriptPath }
+    Use-Path $basedir { Send-HttpRequestToScript -request $request -scriptPath $resolvedScriptPath }
 }
 
 Register-Route PUT mydb {
     #get data from database
     $resolvedScriptPath = "$(Resolve-Path .\DashIron-DataAdapter-oledb.ps1)"
     
-    Use-Path $basedir { Submit-FetchData -request $request -result $result -scriptPath $resolvedScriptPath }
+    Use-Path $basedir { Send-HttpRequestToScript -request $request -scriptPath $resolvedScriptPath }
 }
  
 Register-Route GET mydb-multi {
