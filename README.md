@@ -2,6 +2,8 @@
 
 PowerShell based tool focused on local web page development, used for interacting with databases via a DataAdapter to serve and receive JSON data.
 
+Other scripts or scriptblocks can also be used with the server allowing normal HTML/CSS/JavaScript based pages to replace WPF or WinForms based GUIs.
+
 # Starting the Server
 
 ### The server can be launched directly with a shell, from a Shortcut, or from another script.
@@ -86,18 +88,20 @@ _The script path is resolved before passing it in because `Use-Path` changes the
 
 ```powershell
 Register-Route POST mydb {
-    #get data from database
+    # resolve the script's relative path before Using the $basedir
     $resolvedScriptPath = "$(Resolve-Path .\DashIron-DataAdapter-oledb.ps1)"
-    #write $resolvedScriptPath
+    # with Use-Path all actions in the passed script will happen in the context of the passed path
     Use-Path $basedir { Send-HttpRequestToScript -request $request -scriptPath $resolvedScriptPath }
 }
 ```
 
 To facilitate flexible development, the parameters for connections can be passed into the DashIron-DataAdapter in the HTTP Request body. This allows changes to the database conneciton without having to restart the server.
 
-## DashIron Request Structure
+## DashIron Request Structure and SQL SELECT
 
-To get data you have to request it, with a simple page served from our PowerShell webserver this can be done fairly easily.
+To get data you have to request it. A simple web page can do this fairly easily.
+
+The page doesn't have to be served from the DashIron server. It only needs to call an established route that passes it's request to a DashIron-DataAdapter.
 
 With a POST request, provide the appropriate parameters and data will be returned.
 
@@ -111,7 +115,9 @@ postData("http://localhost:8080/mydb", {
   Provider: "Microsoft.ACE.OLEDB.12.0",
   SQL: "SELECT TOP 100 * From [TestTable]",
   WhereFilter: "1=1"
-});
+})
+  .then(data => console.log(JSON.stringify(data))) // JSON-string from `response.json()` call
+  .catch(error => console.error(error));
 
 //If SQL isn't passed the default is to SELECT * FROM [<SourceTable>]
 postData("http://localhost:8080/mydb", {
@@ -130,19 +136,21 @@ Or, using SQL and a Connection String.
 postData("http://localhost:8080/mydb", {
   SQL: "SELECT * FROM [TestTable]",
   ConnectionString:
-    "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=D:databasesTestDB.accdb"
+    "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=D:/databases/TestDB.accdb"
 });
 
 postData("http://localhost:8080/mydb", {
   SQL: { Select: "SELECT * FROM [TestTable]" },
   ConnectionString:
-    "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=D:databasesTestDB.accdb"
+    "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=D:/databases/TestDB.accdb"
 });
 ```
 
 SQL can be passed as a string (SELECT only), or an object with a SELECT and other actions (only INSERT, UPDATE, and/or DELETE). Defining the additional actions allows them to use complex SQL expressions if needed.
 
-## Insert/Update
+**A SELECT statement is REQUIRED for the DataAdapter to work!** <br>So if you use a connection string or don't use `Provider`, `Sourceinstance`, AND `Sourcedatabase`, then you **MUST** set a SQL SELECT Statement.
+
+## INSERT/UPDATE
 
 Insert/Update require that a `Value` is submitted. The current effect is basically an implied Upsert (Update/Insert). If the SQL statement returns one (1) record it will be updated. If the SQL statement returns 0 or more than 1 record, it will perform an insert.
 
@@ -163,25 +171,25 @@ postData("http://localhost:8080/mydb", {
 });
 ```
 
-## Delete
+## DELETE
 
-Deleting items can be done by sending `Action: "delete"`. This will only delete one element at a time. It deletes the first row returned by the query.
+Deleting items can be done by sending `Action: "delete"`. This will only delete one element at a time. It deletes the first record returned by the query, or nothing if no records are returned.
 
 ```javascript
 postData("http://localhost:8080/mydb", {
-            SourceInstance: "./",
-            SourceDatabase: "TestDB.accdb"
-            SourceTable: "TestTable",
-            Provider: "Microsoft.ACE.OLEDB.12.0",
-            WhereFilter:
-            pk === "" || pk === null || pk === undefined ? "1=1" : `ID=${pk}`,
-            Action: "delete"
-        })
+  SourceInstance: "./",
+  SourceDatabase: "TestDB.accdb",
+  SourceTable: "TestTable",
+  Provider: "Microsoft.ACE.OLEDB.12.0",
+  WhereFilter:
+    pk === "" || pk === null || pk === undefined ? "1=1" : `ID=${pk}`,
+  Action: "delete"
+});
 ```
 
-## Returned Data
+# DashIron-DataAdapter Response
 
-The requested data will be returned as JSON array of objects in `data`.
+The DashIron-DataAdapter returns data in JSON as an array of objects in `data`.
 
 ```json
 {
@@ -201,5 +209,37 @@ The requested data will be returned as JSON array of objects in `data`.
   ]
 }
 ```
+
+If there is no data an empty array is returned.
+
+```json
+{
+  "data": []
+}
+```
+
+# Errors
+
+Errors related to the server are output directly to its PowerShell host window.
+
+The DashIron-DataAdapter will respond with error messages in JSON.
+
+```json
+{
+  "error": {
+    "message": "while opening D:/databases/public . TestDB.accdb . [TestTable] : Error'String was not recognized as a valid DateTime.Couldn't store <> in DateField Column.  Expected type is DateTime.' in script D:/DashIron/DashIronDashIron-DataAdapter-oledb.ps1 $Value | Get-Member -MemberType *Property | ForEach-Object { (line 216) char 61 executing ForEach-Object "
+  }
+}
+```
+
+# Stopping the Server
+
+There are three ways to stop the webserver.
+
+1. Close the PowerShell host window where the server is running.
+
+1. Navigate to the binding's `/quit` or `/exit`; for example, `http://localhost:8080/exit`.
+
+1. Kill the PowerShell process that is running the sever.
 
 [mdn fetch() post example]: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch#Supplying_request_options
