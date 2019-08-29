@@ -165,40 +165,18 @@ try {
     # dataset can be filled using a single parameter once a "SelectCommand" has been set on the DataAdapter
     # the second parameter is the table's name within the dataset, access it with "dataset.Tables[<tablename>]"" 
     $DataAdapter.Fill($dataset, $SourceTable) > $Null
-    # The table copies are only relevant for getting autonumber values from old versions of MS Access or .mdb (and .mdb family) files
-    # further commentary about autonumbers and JET is below
-    #$DataAdapter.Fill($dataset, "$SourceTable-Copy") > $Null
 
     $table = $dataset.Tables[$SourceTable]
-    #$tablecopy = $dataset.Tables[$SourceTable].Copy()
     $columNames = $table.Columns.ColumnName
     
+    # provision our data hash table
+    $data = [ordered] @{ }
+    $effect = @{ }
+    $effect.add('updated', 0)
+    $effect.add('inserted', 0)
+    $effect.add('deleted', 0)
+
     #update from submitted data
-    <#
-    function OnRowUpdated( [object] $sender, [System.Data.OleDb.OleDbRowUpdatedEventArgs] $e) {
-        # Conditionally execute this code block on inserts only.
-        Write-Host "Trying update func"
-        Write-Host $sender
-        Write-Host $e
-        try {
-            #if ($e.StatementType -eq [System.Data.StatementType]::Insert) {
-            Write-Host "in the insert"
-            $cmdNewID = New-Object System.Data.OleDb.OleDbCommand("SELECT @@IDENTITY",
-                $oConn);
-            # Retrieve the Autonumber and store it in the CategoryID column.
-            $e.Row["ID"] = $cmdNewID.ExecuteScalar();
-            $e.Status = UpdateStatus.SkipCurrentRow;
-            #}
-            #else {
-            #    Write-Host "onrowupdate if failed"
-            #}
-        }
-        catch {
-            Write-Host "error in OnRowUpdated"
-        }
-        Write-Host "out of the insert"
-    }
-#>
 
     # when attempting to update a non-existant record, which is interpereted as an insert for now, 
     # the WHERE clause of the SQL statement keeps the new record's auto generated PK from showing up in the results
@@ -212,20 +190,7 @@ try {
             # this is essentially an INSERT... for now
             # there are multiple records but data was submitted, put the submitted data in a new row
             if ($table.Rows.Count -ne 1) {
-                
-                #++++++++++++++++++++++++++++++++++++++++++++++++++++++
-                #++++                                               +++
-                #+++ The auto number issue does not happen with ACE +++
-                #+++ This code will be reomved with the next commit +++ 
-                #+++                                                +++ 
-                #++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-                
-                # there is a potential problem with using MS Access and auto numbers
-                # this doc provides details for JET, but doesn't mention ACE... 
-                # batching seems to be the real root of the issue.
-                # https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/retrieving-identity-or-autonumber-values#retrieving-microsoft-access-autonumber-values
-                
                 $DataAdapter.Update($table) > $null
 
                 $newrow = $table.NewRow()
@@ -245,39 +210,41 @@ try {
                         }
                     }
                 }
-                #$newrow["StringField"] = $Value.StringField
+                # add the new row
                 $table.Rows.Add($newrow)
-                #$table | Out-Host
+                # store only the new row
                 $dc = $table.GetChanges()
-                #$dc | Out-Host
-                #$DataAdapter.Update($dc);
-                #if ($table.PrimaryKey.AutoIncrement) {
-                #    $tablecopy.Merge($dc, $true)
-                #    $tablecopy.AcceptChanges()
-                #    Write-Host "List All Rows-inline (copy):"
-                #    $tablecopy | Out-Host
-                #}
                 
-                # Include an event to fill in the Autonumber value.
-                #$DataAdapter.RowUpdated += New-Object System.Data.OleDb.OleDbRowUpdatedEventHandler(OnRowUpdated);
-                # Update the database, inserting the new rows. 
-                Write-Host "List All Rows-inline (copy):"
-                $DataAdapter.Update($dc) > $null #| Out-Host;
-                #$dc | Out-Host
+                #$newRowRollup = @{ }
+                #$newRowRollup.Add("row", @() )
                 
+                # Update the database, inserting the new rows.
+                # Capture the number of affected items
+                $effect.inserted = $DataAdapter.Update($dc)
 
-                #$DataAdapter.Update($table) > $null
-                # these two are probably pointless, considering that table = dc below
-                #$table.Merge($dc)
-                #$table.AcceptChanges()
-                #$table.Rows = $table.Select("$($table.PrimaryKey.ColumnName)=$($dc.($table.PrimaryKey.ColumnName))")
-                
+                <#
+                foreach ($row in $dc.Rows) {
+                    $temp = @{ };
+                    $columNames.foreach( { $temp.add($_, $row[$_]) } )
+                    $newRowRollup.row += , $temp
+                }
+                $temp = $null;
+                $effect.add('newRows', $newRowRollup )
+                #>
+
+                # $DataAdapter.Update($dc) > $null
+                # $DataAdapter.Update($table) > $null
+
+                # these two are pointless if table = dc below
+                $table.Merge($dc)
+                $table.AcceptChanges()
+
                 # setting the table equal to dc ensures that we are only returning the change
-                $table = $dc
-                #$DataAdapter.Fill($table) > $Null
+                # This will only return the changed entry regardless of what the query was
+                #$table = $dc
             }
 
-            # if there is only one row and data is recieved , try an update
+            # if there is only one row and data is recieved , execute an update
             else {
                 $Value | Get-Member -MemberType *Property | ForEach-Object {
                     if ($table.PrimaryKey.ColumnName -eq ($_.Name) ) {
@@ -295,13 +262,8 @@ try {
                         }
                     }
                 }
-                
-                #$table.Rows[0]["StringField"] = $Value.StringField
-                $DataAdapter.Update($table) > $null
+                $effect.updated = $DataAdapter.Update($table)
             }
-            # show the output from our changes
-            #Write-Host "List All Rows:"
-            #$table | Out-Host
         }
     }
     else {
@@ -310,7 +272,7 @@ try {
                 # only allow single record deletes to help avoid accidental deletion
                 if ($table.Rows.Count -eq 1) {
                     $table.Rows[0].Delete()
-                    $DataAdapter.Update($table) > $null
+                    $effect.deleted = $DataAdapter.Update($table)
                 }
                 break
             }
@@ -326,17 +288,18 @@ try {
         }
     }
 
+    # if there were any effects from the process above, add them to the results
+    if ($effect.Count) {
+        $data | Add-Member -Name 'result' -Type NoteProperty -Value $effect
+    }
+
     # roll the data up and return it as JSON
     # The response structure is :
     #                    {data:[{obj1},{obj2},...]}
-    # The commented rows here are for returning the table and row information with the object
-    # I don't like adding unexpected fields, but may need to depending on what problems come up
-    $data = [ordered] @{ data = @() }
-    #$i = 0
+
+    $data | Add-Member -Name 'data' -Type NoteProperty -Value @()
     foreach ( $row in $table.Rows ) {
-        #$rollup = [PSCustomObject] @{ sourcetable = $table.TableName; sourcerow = $i }
         $rollup = [PSCustomObject] @{ }
-        #$i++
         foreach ($name in $columNames ) {
             $key = $name
             $val = $row[$name]
@@ -351,6 +314,5 @@ try {
     $data | ConvertTo-Json -Compress -depth 100
 }
 catch {
-    # Write-Error "while opening $Sourceinstance . $Sourcedatabase . $SourceTable : Error'$($_)' in script $($_.InvocationInfo.ScriptName) $($_.InvocationInfo.Line.Trim()) (line $($_.InvocationInfo.ScriptLineNumber)) char $($_.InvocationInfo.OffsetInLine) executing $($_.InvocationInfo.MyCommand) "
     return ErrorMessage("while opening $strConn : Error '$($_)' in script $($_.InvocationInfo.ScriptName) $($_.InvocationInfo.Line.Trim()) (line $($_.InvocationInfo.ScriptLineNumber)) char $($_.InvocationInfo.OffsetInLine) executing $($_.InvocationInfo.MyCommand) ")
 }
