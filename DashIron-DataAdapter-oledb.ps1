@@ -47,6 +47,18 @@ try {
                 'Provider', 'Sourceinstance',  and 'Sourcedatabase'")
     }
     $oConn = New-Object System.Data.OleDb.OleDbConnection($strConn)
+
+    # process the Where statement so it can be used in any SELECT scenario
+    if ($WhereFilter -eq "" -or $null -eq $WhereFilter) { 
+        $WhereFilter = "" 
+    }
+    elseif ( $WhereFilter -like "*;*" ) {
+        $WhereFilter = ""
+    }
+    else {
+        $WhereFilter = "WHERE $WhereFilter"
+    }
+
     # Populate the SQL string, SELECT is required
     # User input needs to be sanitized! 
     if ($SQL) {
@@ -65,21 +77,16 @@ try {
                     return ErrorMessage("SQL must be either a STRING or a valid JSON object with a property named 'Select'. `n`nInvalid SELECT: `n$SQL")
                 }
             }
+            # if the SELECT is missing a WHERE clause and a valid $WhereFilter was passed seperately add it here
+            if (!$strSql.Contains("WHERE") -and $WhereFilter.Substring(0, 5) -eq "WHERE") {
+                $strSql += " $WhereFilter"
+            }
         }
         catch {
             return ErrorMessage("SQL must be either a STRING or a valid JSON object with a property named 'Select'. `n`nInvalid SQL: `n$SQL")
         }
     }
     else {
-        if ($WhereFilter -eq "" -or $null -eq $WhereFilter) { 
-            $WhereFilter = "" 
-        }
-        elseif ( $WhereFilter -like "*;*" ) {
-            $WhereFilter = ""
-        }
-        else {
-            $WhereFilter = "WHERE $WhereFilter"
-        }
         $strSql = "SELECT * FROM $SourceTable $WhereFilter"
     }
     if ( $strSql.Substring(0, 6) -ne "SELECT") {
@@ -205,6 +212,15 @@ try {
             # this is essentially an INSERT... for now
             # there are multiple records but data was submitted, put the submitted data in a new row
             if ($table.Rows.Count -ne 1) {
+                
+                #++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                #++++                                               +++
+                #+++ The auto number issue does not happen with ACE +++
+                #+++ This code will be reomved with the next commit +++ 
+                #+++                                                +++ 
+                #++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+                
                 # there is a potential problem with using MS Access and auto numbers
                 # this doc provides details for JET, but doesn't mention ACE... 
                 # batching seems to be the real root of the issue.
@@ -245,9 +261,12 @@ try {
                 # Include an event to fill in the Autonumber value.
                 #$DataAdapter.RowUpdated += New-Object System.Data.OleDb.OleDbRowUpdatedEventHandler(OnRowUpdated);
                 # Update the database, inserting the new rows. 
-                #$DataAdapter.Update($dc);
+                Write-Host "List All Rows-inline (copy):"
+                $DataAdapter.Update($dc) > $null #| Out-Host;
+                #$dc | Out-Host
+                
 
-                $DataAdapter.Update($table) > $null
+                #$DataAdapter.Update($table) > $null
                 # these two are probably pointless, considering that table = dc below
                 #$table.Merge($dc)
                 #$table.AcceptChanges()
@@ -333,5 +352,5 @@ try {
 }
 catch {
     # Write-Error "while opening $Sourceinstance . $Sourcedatabase . $SourceTable : Error'$($_)' in script $($_.InvocationInfo.ScriptName) $($_.InvocationInfo.Line.Trim()) (line $($_.InvocationInfo.ScriptLineNumber)) char $($_.InvocationInfo.OffsetInLine) executing $($_.InvocationInfo.MyCommand) "
-    return ErrorMessage("while opening $Sourceinstance . $Sourcedatabase . $SourceTable : Error'$($_)' in script $($_.InvocationInfo.ScriptName) $($_.InvocationInfo.Line.Trim()) (line $($_.InvocationInfo.ScriptLineNumber)) char $($_.InvocationInfo.OffsetInLine) executing $($_.InvocationInfo.MyCommand) ")
+    return ErrorMessage("while opening $strConn : Error '$($_)' in script $($_.InvocationInfo.ScriptName) $($_.InvocationInfo.Line.Trim()) (line $($_.InvocationInfo.ScriptLineNumber)) char $($_.InvocationInfo.OffsetInLine) executing $($_.InvocationInfo.MyCommand) ")
 }
