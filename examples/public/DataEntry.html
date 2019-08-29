@@ -1,0 +1,111 @@
+<html>
+  <head>
+    <style>
+      body {
+        margin: 40px;
+      }
+      label {
+        font-weight: bold;
+      }
+      input {
+        width: 300px;
+      }
+      input[type="checkbox"] {
+        width: auto;
+      }
+    </style>
+    <script>
+      function displayResponseJSON(responseJSON) {
+        document.getElementById("responseDiv").innerText = JSON.stringify(
+          responseJSON,
+          null,
+          2
+        );
+      }
+      function putData() {
+        let pk = document.getElementById("pk").value;
+        let dateValue = document.getElementById("dateField").value;
+        dateValue === "" ? (dateValue = null) : dateValue;
+        let url = "http://localhost:8080/mydb";
+        let data = {
+          SourceInstance: "../databases",
+          SourceDatabase: "TestDB.accdb",
+          Provider: "Microsoft.ACE.OLEDB.12.0",
+          SQL: "SELECT TOP 5 * From [TestTable]",
+          WhereFilter:
+            pk === "" || pk === null || pk === undefined ? "" : `ID=${pk}`,
+          Value: {
+            ID: pk,
+            StringField: document.getElementById("stringField").value,
+            DateField: dateValue,
+            BoolField: document.getElementById("boolField").checked
+          }
+        };
+        return fetch(url, {
+          method: "PUT",
+          cache: "no-cache",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        })
+          .then(response => response.json())
+          .then(json => displayResponseJSON(json));
+      }
+
+      function deleteData() {
+        let pk = document.getElementById("pk").value;
+        if (pk === "" || pk === null || pk === undefined) {
+          alert("Please enter an ID to delete.");
+          return false;
+        }
+        let url = "http://localhost:8080/mydb";
+        let data = {
+          SourceInstance: "../databases",
+          SourceDatabase: "TestDB.accdb",
+          Provider: "Microsoft.ACE.OLEDB.12.0",
+          SQL: "SELECT * From [TestTable]",
+          WhereFilter: `ID=${pk}`,
+          Action: "delete"
+        };
+        return fetch(url, {
+          method: "POST",
+          cache: "no-cache",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        })
+          .then(response => response.json())
+          .then(json => displayResponseJSON(json));
+      }
+    </script>
+  </head>
+  <body style="margin: 40px;">
+    <form action="" onsubmit="putData();return false;">
+      <p>
+        <label for="pk">ID: </label>
+        <input type="text" maxlength="255" size="30" id="pk" name="pk" />
+      </p>
+      <p>
+        <label for="dateField">Date: </label>
+        <input type="date" id="dateField" name="dateField" />
+      </p>
+      <p>
+        <label for="stringField">Text: </label>
+        <input
+          type="text"
+          maxlength="255"
+          size="30"
+          id="stringField"
+          name="stringField"
+        />
+      </p>
+      <p>
+        <label for="boolField">Bool: </label>
+        <input type="checkbox" checked id="boolField" name="boolField" />
+      </p>
+      <button type="submit" name="button">Execute</button>
+    </form>
+    <button onclick="deleteData()">Delete</button>
+    <div id="responseDiv"></div>
+  </body>
+</html>
