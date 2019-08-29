@@ -199,21 +199,21 @@ Register-Route GET "" {
 }
 
 Register-Route get test {
-    '<html><title>Test</title><body><div style="margin:40px;">Good Test</div></body></html>'
+    "<html><title>Test</title><body><div style=`"margin:40px;`">Good Test <br><br> Base directory: $basedir </div></body></html>"
 }
 
 Register-Route "GET" "test me" {
-    '<html><title>Test</title><body><div style="margin:40px;">Good Test Me</div></body></html>'
+    "<html><title>Test Me</title><body><div style=`"margin:40px;`">Good Test Me <br><br> Base directory: $basedir </div></body></html>"
 }
 
 # need to figure out some way of setting up something similar to express' "static" 
 # for properly serving the web page's associated documents
 Register-Route get dataview.html {
-    Use-Path "$basedir\..\DashIronTestDocs\WatchView" { Get-Content .\dataview.html }
+    Use-Path "$basedir\dataview" { Get-Content .\dataview.html }
 }
 
 Register-Route get dataentry.html {
-    Use-Path "$basedir\..\DashIronTestDocs\" { Get-Content .\dataentry1.html }
+    Use-Path "$basedir" { Get-Content .\dataentry.html }
 }
 
 Register-Route POST mydb {
