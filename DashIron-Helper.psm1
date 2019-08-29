@@ -30,6 +30,7 @@ function Send-HttpRequestToScript {
             { $_ -like "multipart/form-data*" } { 
                 Write-Host "Got Multipart Form"
                 [System.Object] $bodyData = $reader.ReadToEnd()
+                #[System.Net.Http.Headers.HttpContentHeaders]
                 #[System.Net.Http.MultipartContent.MultipartFormDataContent] 
                 break
             }
