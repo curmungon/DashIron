@@ -16,11 +16,12 @@
     </style>
     <script>
       function displayResponseJSON(responseJSON) {
-        document.getElementById("responseDiv").innerText = JSON.stringify(
-          responseJSON,
-          null,
-          2
-        );
+        let jsonString = JSON.stringify(responseJSON, null, 2);
+        jsonString
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&gt;")
+          .replace(/>/g, "&lt;");
+        document.getElementById("responseCode").innerText = jsonString;
       }
       function putData() {
         let pk = document.getElementById("pk").value;
@@ -106,6 +107,8 @@
       <button type="submit" name="button">Execute</button>
     </form>
     <button onclick="deleteData()">Delete</button>
-    <div id="responseDiv"></div>
+    <div>
+      <pre><code id="responseCode"></code></pre>
+    </div>
   </body>
 </html>
