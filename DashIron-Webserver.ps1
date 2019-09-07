@@ -216,6 +216,13 @@ Register-Route get dataentry.html {
     Use-Path "$basedir" { Get-Content .\dataentry.html }
 }
 
+# other applications can be called by providing a route for them
+# this will return some text from a function executed by nodejs 
+# **you must have nodejs on your machine, and it must be in your environment's PATH**
+Register-Route get nodetest {
+    Use-Path "$basedir" { node .\test.js } #can be pipelined with Out-String, Out-File or other commands
+}
+
 Register-Route POST mydb {
     #get data from database
     $resolvedScriptPath = "$(Resolve-Path .\DashIron-DataAdapter-oledb.ps1)"
