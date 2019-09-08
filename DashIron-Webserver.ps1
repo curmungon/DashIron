@@ -416,5 +416,8 @@ finally {
     # Stop powershell webserver
     $listener.Stop()
     $listener.Close()
+    $listener = $NULL
     "$(Get-Date -Format s) Powershell webserver stopped."
+    # terminate the server session
+    stop-process -Id $PID
 }
