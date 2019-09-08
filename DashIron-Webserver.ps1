@@ -208,6 +208,14 @@ Register-Route "GET" "test me" {
 
 # need to figure out some way of setting up something similar to express' "static" 
 # for properly serving the web page's associated documents
+
+# just passing a static directroy in doesn't work yet
+# need to adjust the path/file finding process into a function or something
+Register-Static "$basedir\dataview"
+
+# ** got the named virtual path method working **
+Register-Static "$basedir\dataview" "/static"
+
 Register-Route get dataview.html {
     Use-Path "$basedir\dataview" { Get-Content .\dataview.html }
 }
@@ -291,13 +299,30 @@ try {
         $htmlResponse = ""
         $result = ''
 
+        # check for preset registered routes
         if ($routeRegister.Contains($received) ) {
             $htmlResponse = Invoke-Command -ScriptBlock $routeRegister.$received | Out-String
         }
         else {
-            # unregistered route, check if path to file
-            # create physical path based upon the base dir and url
-            $checkDir = $basedir.TrimEnd("/\") + $request.Url.LocalPath
+            # serve files using a registered static path
+            if ($staticRegister.Contains("/$($request.Url.Segments[1].Replace('/',''))") ) {
+                #write $request.Url.LocalPath
+                #write $staticRegister.Item("/$($request.Url.Segments[1].Replace('/',''))")
+
+                $staticRoute = "/$($request.Url.Segments[1].Replace('/',''))"
+                $staticdir = $staticRegister.Item($staticRoute).root
+
+                $checkDir = $staticdir.TrimEnd("/\") + $request.Url.LocalPath.Replace($staticRoute, "")
+
+                #write "Checkdir:: $checkDir"
+            }
+            # no static path found, revert to default behavior
+            else {
+                # unregistered route, check if path to file
+                # create physical path based upon the base dir and url
+                $checkDir = $basedir.TrimEnd("/\") + $request.Url.LocalPath
+            }
+            
             $checkFile = ""
             if (Test-Path $checkDir -PathType Container) {
                 # physical path is a directory 
