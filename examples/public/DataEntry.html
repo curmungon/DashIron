@@ -1,8 +1,16 @@
 <html>
   <head>
+    <title>DashIron Data Entry</title>
+    <link rel="shortcut icon" href="./DashIron.png" type="image/x-icon" />
+
+    <script src="./fetch.umd.js"></script>
+
     <style>
       body {
         margin: 40px;
+      }
+      form {
+        width: 350px;
       }
       label {
         font-weight: bold;
@@ -82,15 +90,15 @@
   </head>
   <body style="margin: 40px;">
     <form action="" onsubmit="putData();return false;">
-      <p>
+      <fieldset>
         <label for="pk">ID: </label>
         <input type="text" maxlength="255" size="30" id="pk" name="pk" />
-      </p>
-      <p>
+      </fieldset>
+      <fieldset>
         <label for="dateField">Date: </label>
         <input type="date" id="dateField" name="dateField" />
-      </p>
-      <p>
+      </fieldset>
+      <fieldset>
         <label for="stringField">Text: </label>
         <input
           type="text"
@@ -99,16 +107,22 @@
           id="stringField"
           name="stringField"
         />
-      </p>
-      <p>
+      </fieldset>
+      <fieldset>
         <label for="boolField">Bool: </label>
         <input type="checkbox" checked id="boolField" name="boolField" />
-      </p>
-      <button type="submit" name="button">Execute</button>
+      </fieldset>
+      <br />
+      <button type="submit" name="button">Submit</button>
     </form>
     <button onclick="deleteData()">Delete</button>
     <div>
       <pre><code id="responseCode"></code></pre>
     </div>
+
+    <!-- set the default date as today... quick and dirty -->
+    <script>
+      document.getElementById("dateField").valueAsDate = new Date();
+    </script>
   </body>
 </html>
