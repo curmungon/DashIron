@@ -1,6 +1,7 @@
 # registered routes will be added to routeRegister
 # the method and route ,together, are the key the callback is the value
 $routeRegister = @{ }
+$staticRegister = [ordered] @{ }
 
 function Register-Route {
     param (
@@ -36,6 +37,43 @@ function Register-Route {
     $routeRegister.Add("$method $route", $callback)
 }
 
+function Register-Static {
+    param (
+        [ValidateNotNullOrEmpty()]
+        [string] $path,
+        [string] $virtualPathPrefix
+    )
+    try {
+        if (Test-Path $path -PathType Container) {
+            try {
+                $newStatic = New-PSDrive -Name $(New-Guid) -PSProvider FileSystem -Root $path
+                if ($virtualPathPrefix) {
+                    $staticRegister.Add("$virtualPathPrefix", $newStatic)
+                }
+                else {
+                    $staticRegister.Add("$($newStatic.name)", $newStatic)
+                }
+            } 
+            catch {
+                if ($Error.Count -gt 0) {
+                    # retrieve error message on error
+                    Write-Host $Error[0]
+                    $Error.Clear()
+                }
+            }
+        }
+        else {
+            throw "Invald Folder Path. Path must resolve to a vaild folder. `nPath:`n$path"
+        }
+    }
+    catch {
+        if ($Error.Count -gt 0) {
+            # retrieve error message on error
+            Write-Host $Error[0]
+            $Error.Clear()
+        }
+    }
+}
 
 function Use-Path {
     param (
@@ -99,4 +137,4 @@ function Use-Script {
 }
 
 
-Export-ModuleMember -Function * -Alias * -Variable routeRegister
+Export-ModuleMember -Function * -Alias * -Variable routeRegister, staticRegister
