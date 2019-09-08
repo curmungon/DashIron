@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <title>DashIron Data View</title>
+    <link
+      rel="shortcut icon"
+      href="./static/../DashIron.png"
+      type="image/x-icon"
+    />
+
+    <link rel="stylesheet" href="./static/index.css" />
+
+    <script src="./static/react/16.3.2/react.development.js"></script>
+    <script src="./static/react/16.3.2/react-dom.development.js"></script>
+    <script src="./static/react/16.3.2/babel.min.js"></script>
+    <script src="./static/fetch.umd.js"></script>
+
+    <!-- <script src="./static/react/16.3.2/react.production.min.js"></script>
+    <script src="./static/react/16.3.2/react-dom.production.min.js"></script>
+    <script src="./static/react/16.3.2/babel.min.js"></script> -->
+
+    <script>
+      function cleanResponseJSON(responseJSON) {
+        let jsonString = JSON.stringify(responseJSON, null, 2);
+        jsonString
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&gt;")
+          .replace(/>/g, "&lt;");
+        return jsonString;
+      }
+      function postData(url = ``, data = {}) {
+        // Default options are marked with *
+        return fetch(url, {
+          method: "POST", // *GET, POST, PUT, DELETE, etc.
+          mode: "cors", // no-cors, cors, *same-origin
+          cache: "no-cache", // *default, no-cache, reload, force-cache, only-if-cached
+          credentials: "same-origin", // include, *same-origin, omit
+          headers: {
+            "Content-Type": "application/json"
+            // "Content-Type": "application/x-www-form-urlencoded",
+          },
+          redirect: "follow", // manual, *follow, error
+          referrer: "no-referrer", // no-referrer, *client
+          body: JSON.stringify(data) // body data type must match "Content-Type" header
+        }).then(response => response.json()); // parses JSON response into native Javascript objects
+      }
+      function putData(url = ``, data = {}) {
+        // Default options are marked with *
+        return fetch(url, {
+          method: "PUT", // *GET, POST, PUT, DELETE, etc.
+          mode: "cors", // no-cors, cors, *same-origin
+          cache: "no-cache", // *default, no-cache, reload, force-cache, only-if-cached
+          credentials: "same-origin", // include, *same-origin, omit
+          headers: {
+            "Content-Type": "application/json"
+            // "Content-Type": "application/x-www-form-urlencoded",
+          },
+          redirect: "follow", // manual, *follow, error
+          referrer: "no-referrer", // no-referrer, *client
+          body: JSON.stringify(data) // body data type must match "Content-Type" header
+        }).then(response => response.json()); // parses JSON response into native Javascript objects
+      }
+    </script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      class App extends React.Component {
+        constructor(props) {
+          super(props);
+          this.state = {
+            data: null
+          };
+        }
+        incrementDate(amount) {
+          let dateControl = document.getElementById("dateField");
+          let currentDay = dateControl.valueAsDate.getDate();
+          dateControl.valueAsDate = new Date(
+            dateControl.valueAsDate.setDate(currentDay + amount)
+          );
+        }
+
+        getData() {
+          let filterdate = document.getElementById("dateField").value;
+          postData("http://localhost:8080/mydb", {
+            SourceInstance: "../databases",
+            SourceDatabase: "TestDB.accdb",
+            Provider: "Microsoft.ACE.OLEDB.12.0",
+            SQL: { Select: "SELECT * FROM [TestTable]" },
+            WhereFilter:
+              filterdate === "" ? "1<>1" : `DateField=#${filterdate}#`
+          })
+            .then(data => {
+              this.setState({ data: data.data });
+            })
+            .catch(error => console.error(error));
+        }
+
+        componentDidMount() {
+          document.getElementById("dateField").valueAsDate = new Date();
+          this.getData();
+        }
+
+        render() {
+          // the first input (hidden) allows VBA to have an element to check for
+          // if you are using the page inside of Access instead of a regular form
+          // using a webpage is easier than de-coupling a native form in Access and still having everything work
+          return (
+            <div className="wrapper">
+              <input
+                readOnly
+                id="ms-access-loaded-check"
+                className="ms-access-loaded-check"
+                type="text"
+                value="1"
+                style={{ display: "none" }}
+              />
+              <br />
+              <input
+                id="dateField"
+                type="date"
+                onChange={() => this.getData()}
+              />
+              &nbsp;
+              <button onClick={() => this.getData()}>Refresh Data</button>
+              <br />
+              <button
+                onClick={() => {
+                  this.incrementDate(1);
+                  this.getData();
+                }}
+              >
+                +
+              </button>
+              <button
+                onClick={() => {
+                  this.incrementDate(-1);
+                  this.getData();
+                }}
+              >
+                -
+              </button>
+              <div id="data-holder" />
+              <div>
+                {this.state.data !== null ? (
+                  <ul>
+                    {this.state.data.map(elm => (
+                      <li key={elm.PK}>
+                        <pre>
+                          <code>{cleanResponseJSON(elm)}</code>
+                        </pre>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            </div>
+          );
+        }
+      }
+      ReactDOM.render(<App />, document.getElementById("root"));
+    </script>
+  </body>
+</html>
