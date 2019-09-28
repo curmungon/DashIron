@@ -76,6 +76,28 @@ Register-Route "GET" "test me" {
 }
 ```
 
+## Static Routes
+
+Establishing static routes currently requires them to be "named". This will allow relative paths from documents to work with the appropriate named prefix. **The leading `/` is required for the static name.**
+
+```powershell
+Register-Static "$basedir\dataview" "/static"
+```
+
+Will allow the path named `/static` to work properly for serving the basedir's `\dataview` folder.
+
+```html
+<link rel="stylesheet" href="./static/index.css" />
+```
+
+OR
+
+```html
+<script src="./static/react/16.3.2/react.development.js"></script>
+```
+
+Multiple static paths can be established as long as they have different names.
+
 # Using a Datasource
 
 ## HTTP Request Body to a DashIron-DataAdapter
