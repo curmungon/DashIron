@@ -60,7 +60,25 @@
           .then(response => response.json())
           .then(json => displayResponseJSON(json));
       }
-
+      function getAllData() {
+        let url = "http://localhost:8080/mydb";
+        let data = {
+          SourceInstance: "../databases",
+          SourceDatabase: "TestDB.accdb",
+          Provider: "Microsoft.ACE.OLEDB.12.0",
+          SQL: { Select: "SELECT * FROM [TestTable]" },
+          WhereFilter: "1=1"
+        };
+        return fetch(url, {
+          method: "POST",
+          cache: "no-cache",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        })
+          .then(response => response.json())
+          .then(json => displayResponseJSON(json));
+      }
       function deleteData() {
         let pk = document.getElementById("pk").value;
         if (pk === "" || pk === null || pk === undefined) {
@@ -116,7 +134,10 @@
         <input type="checkbox" checked id="boolField" name="boolField" />
       </fieldset>
       <br />
-      <button type="submit" name="button">Submit</button>
+      <button type="submit" name="button">Submit</button> &nbsp;
+      <button type="button" name="button" onclick="getAllData()">
+        Show Data
+      </button>
     </form>
     <button onclick="deleteData()">Delete</button>
     <button onclick="quit()">Close the Server</button>
