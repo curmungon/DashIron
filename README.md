@@ -150,9 +150,15 @@ SQL can be passed as a string (SELECT only), or an object with a SELECT and othe
 
 **A SELECT statement is REQUIRED for the DataAdapter to work!** <br>So if you use a connection string or don't use `Provider`, `Sourceinstance`, AND `Sourcedatabase`, then you **MUST** set a SQL SELECT Statement.
 
-## INSERT/UPDATE
+## INSERT/UPDATE/UPSERT
 
-Insert/Update require that a `Value` is submitted. The current effect is basically an implied Upsert (Update/Insert). If the SQL statement returns one (1) record it will be updated. If the SQL statement returns 0 or more than 1 record, it will perform an insert.
+Insert, Update, and Upsert are available as named actions, `Action: "insert"`, etc. If no `Action` is provided the default action will be either a `SELECT` (if no `Value` is present), or an `upsert` (Update/Insert).
+
+The Insert/Update/Upsert Actions require that some `Value` is submitted. _If an `Action` is specified and no `Value` is submitted the request will return an error._
+
+**Upsert's current behavior is as follows:**
+
+_If the SQL statement returns one (1) record it will be updated. If the SQL statement returns 0 or more than 1 record, it will perform an insert._
 
 ```javascript
 postData("http://localhost:8080/mydb", {
@@ -167,7 +173,8 @@ postData("http://localhost:8080/mydb", {
     StringField: document.getElementById("value").value,
     WatchbillDate: document.getElementById("wbDate").value,
     bool: true
-  }
+  },
+  Action: "upsert"
 });
 ```
 
