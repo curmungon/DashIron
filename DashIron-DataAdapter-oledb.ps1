@@ -46,7 +46,7 @@ function New-Record {
         }
         else {
             # because the data is going through a DataAdapter $null needs to become DBNull
-            if ($Value.($_.Name) -eq $null) {
+            if ($null -eq $Value.($_.Name)) {
                 $newrow[($_.Name)] = [DBNull]::Value
             }
             else {
