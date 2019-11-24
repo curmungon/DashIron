@@ -46,7 +46,7 @@ function Register-Static {
     try {
         if (Test-Path $path -PathType Container) {
             try {
-                $newStatic = New-PSDrive -Name $(New-Guid) -PSProvider FileSystem -Root $path
+                $newStatic = New-PSDrive -Name $(Get-Random) -PSProvider FileSystem -Root $path
                 if ($virtualPathPrefix) {
                     $staticRegister.Add("$virtualPathPrefix", $newStatic)
                 }
