@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <title>DashIron Data Entry</title>
+    <link rel="shortcut icon" href="./DashIron.png" type="image/x-icon" />
+
+    <!-- if we're polyflling fetch, it needs to be done for promises also
+    <script src="./es-6-promise.js"></script>
+    <script src="./fetch.umd.js"></script> -->
+
+    <style>
+      body {
+        margin: 40px;
+      }
+      form {
+        width: 350px;
+      }
+      label {
+        font-weight: bold;
+      }
+      input {
+        width: 300px;
+      }
+      input[type="checkbox"] {
+        width: auto;
+      }
+    </style>
+    <script>
+      function displayResponseJSON(responseJSON) {
+        let jsonString = JSON.stringify(responseJSON, null, 2);
+        jsonString
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&gt;")
+          .replace(/>/g, "&lt;");
+        document.getElementById("responseCode").innerText = jsonString;
+      }
+      function putData() {
+        let pk = document.getElementById("pk").value;
+        let dateValue = document.getElementById("dateField").value;
+        dateValue === "" ? (dateValue = null) : dateValue;
+        let url = "http://localhost:8080/mydb";
+        let data = {
+          SourceInstance: "../databases",
+          SourceDatabase: "TestDB.accdb",
+          Provider: "Microsoft.ACE.OLEDB.12.0",
+          SQL: "SELECT TOP 5 * From [TestTable]",
+          WhereFilter:
+            pk === "" || pk === null || pk === undefined ? "" : `ID=${pk}`,
+          Value: {
+            ID: pk,
+            StringField: document.getElementById("stringField").value,
+            DateField: dateValue,
+            BoolField: document.getElementById("boolField").checked
+          }
+        };
+        return fetch(url, {
+          method: "PUT",
+          cache: "no-cache",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        })
+          .then(response => response.json())
+          .then(json => displayResponseJSON(json));
+      }
+      function getAllData() {
+        let url = "http://localhost:8080/mydb";
+        let data = {
+          SourceInstance: "../databases",
+          SourceDatabase: "TestDB.accdb",
+          Provider: "Microsoft.ACE.OLEDB.12.0",
+          SQL: { Select: "SELECT * FROM [TestTable]" },
+          WhereFilter: "1=1"
+        };
+        return fetch(url, {
+          method: "POST",
+          cache: "no-cache",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        })
+          .then(response => response.json())
+          .then(json => displayResponseJSON(json));
+      }
+      function deleteData() {
+        let pk = document.getElementById("pk").value;
+        if (pk === "" || pk === null || pk === undefined) {
+          alert("Please enter an ID to delete.");
+          return false;
+        }
+        let url = "http://localhost:8080/mydb";
+        let data = {
+          SourceInstance: "../databases",
+          SourceDatabase: "TestDB.accdb",
+          Provider: "Microsoft.ACE.OLEDB.12.0",
+          SQL: "SELECT * From [TestTable]",
+          WhereFilter: `ID=${pk}`,
+          Action: "delete"
+        };
+        return fetch(url, {
+          method: "POST",
+          cache: "no-cache",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        })
+          .then(response => response.json())
+          .then(json => displayResponseJSON(json));
+      }
+      function quit() {
+        fetch("http://localhost:8080/quit");
+      }
+    </script>
+  </head>
+  <body style="margin: 40px;">
+    <form action="" onsubmit="putData();return false;">
+      <fieldset>
+        <label for="pk">ID: </label>
+        <input type="text" maxlength="255" size="30" id="pk" name="pk" />
+      </fieldset>
+      <fieldset>
+        <label for="dateField">Date: </label>
+        <input type="date" id="dateField" name="dateField" />
+      </fieldset>
+      <fieldset>
+        <label for="stringField">Text: </label>
+        <input
+          type="text"
+          maxlength="255"
+          size="30"
+          id="stringField"
+          name="stringField"
+        />
+      </fieldset>
+      <fieldset>
+        <label for="boolField">Bool: </label>
+        <input type="checkbox" checked id="boolField" name="boolField" />
+      </fieldset>
+      <br />
+      <button type="submit" name="button">Submit</button> &nbsp;
+      <button type="button" name="button" onclick="getAllData()">
+        Show Data
+      </button>
+    </form>
+    <button onclick="deleteData()">Delete</button>
+    <button onclick="quit()">Close the Server</button>
+    <div>
+      <pre><code id="responseCode"></code></pre>
+    </div>
+
+    <!-- set the default date as today... quick and dirty -->
+    <script>
+      document.getElementById("dateField").valueAsDate = new Date();
+    </script>
+  </body>
+</html>
