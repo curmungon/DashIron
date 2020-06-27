@@ -161,11 +161,11 @@ Register-Route GET "" {
     $localhtml = @"
         <html><body>
             !HEADERLINE
-            <pre>!RESULT</pre>
+            
             <form method="GET" action="/">
             <b>!PROMPT&nbsp;</b><input type="text" maxlength=255 size=80 name="command" value='!FORMFIELD'>
             <input type="submit" name="button" value="Enter">
-            
+            <pre>!RESULT</pre>
             </form>
         </body></html>
 "@
@@ -211,6 +211,7 @@ Register-Route "GET" "test me" {
 
 # just passing a static directroy in doesn't work yet
 # need to adjust the path/file finding process into a function or something
+# .... perhaps a "Use-Static" function that wraps specific calls???
 Register-Static "$basedir\dataview"
 
 # ** got the named virtual path method working **

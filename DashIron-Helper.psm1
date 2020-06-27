@@ -1,4 +1,15 @@
+<#
+.Synopsis
+Helper module to assist DashIron and it's components.
+.Description
+Helper module to assist DashIron and it's components.
+.Example
+This script is intended for use within DashIron-Webserver.ps1 and its assoicated scripts.
+.Notes
+Author: Nathan Moyer
+#>
 
+# returns a JSON formatted message containing error information
 function ErrorMessage {
     param (
         [Parameter(Mandatory = $true)][string] $Message
@@ -6,6 +17,9 @@ function ErrorMessage {
     [ordered] @{error = @{message = $Message } } | ConvertTo-Json -Compress -Depth 5
 }
 
+# Passes request parameters submitted via "POST" method (JSON only, working on multipart/form-data)
+# for execution by the requested PowerShell script (must accept a "params" argument)
+# Use-Path 
 function Send-HttpRequestToScript {
     param (
         # Parameter help description

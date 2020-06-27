@@ -1,3 +1,14 @@
+<#
+.Synopsis
+Helper module to assist DashIron-Webserver.ps1 with URL routing.
+.Description
+Helper module to assist DashIron-Webserver.ps1 with URL routing.
+.Example
+This script is intended for use within DashIron-Webserver.ps1
+.Notes
+Author: Nathan Moyer
+#>
+
 # registered routes will be added to routeRegister
 # the method and route ,together, are the key the callback is the value
 $routeRegister = @{ }
@@ -37,6 +48,8 @@ function Register-Route {
     $routeRegister.Add("$method $route", $callback)
 }
 
+# register a static path to serve files from. Must have a prefix.
+# Using un-prefixed static paths (enabling ExpressJS-like "static" behavior) doesn't work correctly
 function Register-Static {
     param (
         [ValidateNotNullOrEmpty()]
@@ -75,6 +88,8 @@ function Register-Static {
     }
 }
 
+# Set a path to use for calling a Script Block
+# The Script Block can execute arbitrary commandlets, scripts, applictions, etc. and can include pipelines
 function Use-Path {
     param (
         [ValidateNotNullOrEmpty()]
@@ -124,7 +139,7 @@ function Use-Script {
     )
     if ($scriptpath) {
         try {
-            # verify the path is a valid leaf and a ps1f file
+            # verify the path is a valid leaf and a ps1 file
             if (Test-Path -path $scriptpath -PathType Leaf -and $($scriptpath).endswith(".ps1")) {
                 
             }
