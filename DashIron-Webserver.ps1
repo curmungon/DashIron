@@ -83,7 +83,7 @@ param(
 
 #>
 # ensure $RunAs32 is a Boolean
-# $RunAs32 can be changed to a switch in the future, once TRUE a less sensible default
+# $RunAs32 can be changed to a switch in the future, once TRUE is a less sensible default
 try {
     [System.Convert]::ToBoolean($RunAs32) > $NULL
 }
@@ -161,11 +161,15 @@ if (Test-Path .\routes.ps1 -PathType Leaf) {
     Import-Module -Name .\routes.ps1
 }
 # A seperate "routes.ps1" isn't required. Additional routes can be placed here.
-#  *********** BEGIN INLINE ROUTE SECTION ***********
+#  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+#  >>>>>>>>>>> BEGIN INLINE ROUTE SECTION <<<<<<<<<<<
+#  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
 
-#  *********** END INLINE ROUTE SECTION *************
+#  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+#  >>>>>>>>>>> END INLINE ROUTE SECTION <<<<<<<<<<<<<
+#  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 # Starting the powershell webserver
 "$(Get-Date -Format s) Starting powershell webserver..."
