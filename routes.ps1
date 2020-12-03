@@ -56,7 +56,7 @@ Register-Route "GET" "test me" {
 # .... perhaps a "Use-Static" function that wraps specific calls???
 Register-Static "$basedir\dataview"
 
-# ** got the named virtual path method working **
+# creates a static path accessible via "/static" any arbitrary name can be used
 Register-Static "$basedir\dataview" "/static"
 
 Register-Route get dataview.html {
@@ -87,7 +87,7 @@ Register-Route PUT mydb {
     
     Use-Path $basedir { Send-HttpRequestToScript -request $request -scriptPath $resolvedScriptPath }
 }
- 
+# multipart form example for submitting data
 Register-Route GET mydb-multi {
     @"
     <html><body>
@@ -101,11 +101,3 @@ Register-Route GET mydb-multi {
     </body></html>
 "@
 }
-
-Register-Route 'GET' '/log' { "<html><body>$headerline Log of powershell webserver:<br /><pre>$webserverLog</pre></body></html>" }
-Register-Route 'GET' '/starttime' { "<html><body>$headerline Powershell webserver started at $serverStartTime</body></html>" }
-Register-Route 'GET' '/time' { "<html><body>$headerline Current time: $(Get-Date -Format s)</body></html>" }
-# routes for stopping the server
-Register-Route 'GET' '/exit' { "<html><body>Stopped powershell webserver</body></html>" }
-Register-Route 'GET' '/quit' { "<html><body>Stopped powershell webserver</body></html>" }
-
