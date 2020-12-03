@@ -51,10 +51,10 @@ DashIron-Webserver.ps1 -RunAs32 false
 
 Starts webserver with binding to http://localhost:8080/ and bypasses the default RunAs32 behavior for the entire session
 .Example
-schtasks.exe /Create /TN "Powershell Webserver" /TR "powershell -file C:\Users\Markus\Documents\Start-WebServer.ps1 http://+:8080/" /SC ONSTART /RU SYSTEM /RL HIGHEST /F
+schtasks.exe /Create /TN "Powershell Webserver" /TR "powershell -file C:\Users\Markus\Documents\DashIron-Webserver.ps1 http://+:8080/" /SC ONSTART /RU SYSTEM /RL HIGHEST /F
 
 Starts powershell webserver as scheduled task as user local system every time the computer starts (when the
-correct path to the file Start-WebServer.ps1 is given).
+correct path to the file DashIron-Webserver.ps1 is given).
 You can start the webserver task manually with
 	schtasks.exe /Run /TN "Powershell Webserver"
 Delete the webserver task with
@@ -72,14 +72,14 @@ param(
     [switch] $openbrowser,
     [string] $startpage = "",
     $RunAs32 = $TRUE,
-    $RunOnce = $TRUE
+    $RunOnce = $TRUE #RunOnce is used to initilize the server as 32 or 64 bit regardless of the environment it's launched from
 )
 <#
- a 32 bit shell is required in order to interface with 32 bit drivers. 
- the majority of MS Office installations are currently 32 bit, so the
- sensible default behavior at this time is to start with a 32 bit shell
- 
- TODO: add a way to detect what type of shell needs to be run based on the connection being made, probably in the connection script
+    a 32 bit shell is required in order to interface with 32 bit drivers. 
+    the majority of MS Office installations are currently 32 bit, so the
+    sensible default behavior at this time is to start with a 32 bit shell
+    
+    TODO: add a way to detect what type of shell needs to be run based on the connection being made, probably in the connection script
 
 #>
 # ensure $RunAs32 is a Boolean
@@ -101,6 +101,7 @@ catch [FormatException] {
 }
 
 # build the options and command for starting the server's shell session
+# certain options have caused issues with the sever starting on secure machines
 $newShellOptions = '-noexit', '-noprofile', '-executionpolicy bypass', '-nologo', '-windowstyle normal', '-mta'
 $newShellCommand = "-command `".\DashIron-WebServer.ps1 -runas32 $RunAs32 -binding $binding -basedir $basedir -startpage '$startpage' $(if($openbrowser){'-openbrowser'}) -RunOnce false`""
 [string[]] $newShellArgs = $newShellOptions, $newShellCommand
@@ -151,9 +152,9 @@ Import-Module -Name .\DashIron-Router
 Import-Module -Name .\DashIron-Helper
 
 # MIME hash table for static content
-$mimehash = @{".avi" = "video/x-msvideo"; ".crt" = "application/x-x509-ca-cert"; ".css" = "text/css"; ".der" = "application/x-x509-ca-cert"; ".flv" = "video/x-flv"; ".gif" = "image/gif"; ".htm" = "text/html"; ".html" = "text/html"; ".ico" = "image/x-icon"; ".jar" = "application/java-archive"; ".jardiff" = "application/x-java-archive-diff"; ".jpeg" = "image/jpeg"; ".jpg" = "image/jpeg"; ".js" = "application/x-javascript"; ".mov" = "video/quicktime"; ".mp3" = "audio/mpeg"; ".mpeg" = "video/mpeg"; ".mpg" = "video/mpeg"; ".pdf" = "application/pdf"; ".pem" = "application/x-x509-ca-cert"; ".pl" = "application/x-perl"; ".png" = "image/png"; ".rss" = "text/xml"; ".shtml" = "text/html"; ".swf" = "application/x-shockwave-flash"; ".txt" = "text/plain"; ".war" = "application/java-archive"; ".wmv" = "video/x-ms-wmv"; ".xml" = "text/xml" }
+$mimehash = @{".avi" = "video/x-msvideo"; ".crt" = "application/x-x509-ca-cert"; ".css" = "text/css"; ".der" = "application/x-x509-ca-cert"; ".flv" = "video/x-flv"; ".gif" = "image/gif"; ".htm" = "text/html"; ".html" = "text/html"; ".ico" = "image/x-icon"; ".jar" = "application/java-archive"; ".jardiff" = "application/x-java-archive-diff"; ".jpeg" = "image/jpeg"; ".jpg" = "image/jpeg"; ".js" = "application/x-javascript"; ".mov" = "video/quicktime"; ".mp3" = "audio/mpeg"; ".mpeg" = "video/mpeg"; ".mpg" = "video/mpeg"; ".pdf" = "application/pdf"; ".pem" = "application/x-x509-ca-cert"; ".pl" = "application/x-perl"; ".png" = "image/png"; ".rss" = "text/xml"; ".shtml" = "text/html"; ".swf" = "application/x-shockwave-flash"; ".txt" = "text/plain"; ".war" = "application/java-archive"; ".webp" = "image/webp"; ".wmv" = "video/x-ms-wmv"; ".xml" = "text/xml" }
 
-# Set navigation header line for all web pages
+# Set navigation header line for built-in pages
 $headerline = "<p><a href='/'>Command execution</a> <a href='/download'>Download file</a> <a href='/upload'>Upload file</a> <a href='/log'>Web logs</a> <a href='/starttime'>Webserver start time</a> <a href='/time'>Current time</a> <a href='/quit'>Stop webserver</a></p>"
 
 # if a route file is present, use it
@@ -164,6 +165,14 @@ if (Test-Path .\routes.ps1 -PathType Leaf) {
 #  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 #  >>>>>>>>>>> BEGIN INLINE ROUTE SECTION <<<<<<<<<<<
 #  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# These are some utility routes for getting simple information
+Register-Route 'GET' '/log' { "<html><body>$headerline Log of powershell webserver:<br /><pre>$webserverLog</pre></body></html>" }
+Register-Route 'GET' '/starttime' { "<html><body>$headerline Powershell webserver started at $serverStartTime</body></html>" }
+Register-Route 'GET' '/time' { "<html><body>$headerline Current time: $(Get-Date -Format s)</body></html>" }
+# routes for stopping the server
+# if you delete these you'll have to close the window that the sever is running in to kill it
+Register-Route 'GET' '/exit' { "<html><body>Stopped powershell webserver</body></html>" }
+Register-Route 'GET' '/quit' { "<html><body>Stopped powershell webserver</body></html>" }
 
 
 
@@ -279,6 +288,7 @@ try {
                     # retrieve error message on error
                     $result += "`nError while downloading '$checkFile'`n`n"
                     $result += $Error[0]
+                    Write-Error $result
                     $Error.Clear()
                     # Don't send a JSON formatted error for this
                 }
